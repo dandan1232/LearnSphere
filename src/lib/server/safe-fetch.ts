@@ -124,6 +124,21 @@ async function resolvePublicAddress(hostname: string) {
   return addresses.find((entry) => entry.family === 4) ?? addresses[0];
 }
 
+export async function createSafeDispatcher(parsedUrl: URL) {
+  const resolvedAddress = await resolvePublicAddress(parsedUrl.hostname);
+  return new Agent({
+    connect: {
+      lookup: (_hostname, options, callback) => {
+        if (options.all) {
+          callback(null, [resolvedAddress]);
+          return;
+        }
+        callback(null, resolvedAddress.address, resolvedAddress.family);
+      },
+    },
+  });
+}
+
 function getHeaderValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] ?? "" : value ?? "";
 }
@@ -149,20 +164,9 @@ async function readBoundedBody(body: AsyncIterable<Uint8Array>, contentLength: s
 
 export async function safeFetchText(rawUrl: string, redirectCount = 0): Promise<SafeFetchResult> {
   const parsedUrl = parsePublicUrl(rawUrl);
-  const resolvedAddress = await resolvePublicAddress(parsedUrl.hostname);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  const dispatcher = new Agent({
-    connect: {
-      lookup: (_hostname, _options, callback) => {
-        if (_options.all) {
-          callback(null, [resolvedAddress]);
-          return;
-        }
-        callback(null, resolvedAddress.address, resolvedAddress.family);
-      },
-    },
-  });
+  const dispatcher = await createSafeDispatcher(parsedUrl);
 
   try {
     const response = await request(parsedUrl, {
