@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import { TutorPanel } from "@/components/tutor-panel";
 import {
   attemptSchema,
   questionResultSchema,
@@ -32,6 +33,7 @@ export function AttemptPlayer({ attemptId }: { attemptId: string }) {
   const [saving, setSaving] = useState(false);
   const [grading, setGrading] = useState(false);
   const [error, setError] = useState("");
+  const [tutorOpen, setTutorOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -75,6 +77,20 @@ export function AttemptPlayer({ attemptId }: { attemptId: string }) {
       updatedAt: new Date().toISOString(),
     });
     setError("");
+  }
+
+  function recordAssistance() {
+    if (!attempt || !question) return;
+    const nextAttempt = attemptSchema.parse({
+      ...attempt,
+      assistance: [
+        ...attempt.assistance,
+        { questionId: question.id, mode: "guided", usedAt: new Date().toISOString() },
+      ],
+      updatedAt: new Date().toISOString(),
+    });
+    setAttempt(nextAttempt);
+    void putAttempt(nextAttempt);
   }
 
   function selectOption(optionId: string) {
@@ -248,6 +264,12 @@ export function AttemptPlayer({ attemptId }: { attemptId: string }) {
         )}
       </article>
 
+      <button className="tutor-trigger" type="button" onClick={() => setTutorOpen(true)}>
+        <span aria-hidden="true">?</span>
+        <strong>问 AI 要一个提示</strong>
+        <em>只引导，不直接给答案 →</em>
+      </button>
+
       {error ? (
         <div className="notice notice--error" role="alert">
           <strong>还没有完成评分</strong>
@@ -271,6 +293,16 @@ export function AttemptPlayer({ attemptId }: { attemptId: string }) {
           </button>
         )}
       </nav>
+      {tutorOpen ? (
+        <TutorPanel
+          attempt={attempt}
+          question={question}
+          result={null}
+          mode="guided"
+          onClose={() => setTutorOpen(false)}
+          onUsed={recordAssistance}
+        />
+      ) : null}
     </section>
   );
 }

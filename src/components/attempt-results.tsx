@@ -3,19 +3,26 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import { TutorPanel } from "@/components/tutor-panel";
 import type { Attempt } from "@/lib/domain/models";
-import { getAttempt } from "@/lib/storage/database";
+import { attemptSchema } from "@/lib/domain/models";
+import { getAttempt, putAttempt } from "@/lib/storage/database";
 
 const typeLabel = { single: "单选", multiple: "多选", boolean: "判断", short: "简答" } as const;
 
 export function AttemptResults({ attemptId }: { attemptId: string }) {
   const [attempt, setAttempt] = useState<Attempt | null | undefined>(undefined);
+  const [tutorQuestionId, setTutorQuestionId] = useState("");
+  const [highlightedQuestionId, setHighlightedQuestionId] = useState("");
 
   useEffect(() => {
     let active = true;
     getAttempt(attemptId)
       .then((record) => {
-        if (active) setAttempt(record ?? null);
+        if (!active) return;
+        setAttempt(record ?? null);
+        const hash = decodeURIComponent(window.location.hash).replace(/^#question-/, "");
+        if (hash) setHighlightedQuestionId(hash);
       })
       .catch(() => {
         if (active) setAttempt(null);
@@ -24,6 +31,16 @@ export function AttemptResults({ attemptId }: { attemptId: string }) {
       active = false;
     };
   }, [attemptId]);
+
+  useEffect(() => {
+    if (!attempt || !highlightedQuestionId) return;
+    const frame = window.requestAnimationFrame(() => {
+      document
+        .getElementById(`question-${highlightedQuestionId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [attempt, highlightedQuestionId]);
 
   const summary = useMemo(() => {
     if (!attempt) return { full: 0, partial: 0, wrong: 0 };
@@ -37,6 +54,20 @@ export function AttemptResults({ attemptId }: { attemptId: string }) {
       { full: 0, partial: 0, wrong: 0 },
     );
   }, [attempt]);
+
+  function recordAssistance(questionId: string) {
+    if (!attempt) return;
+    const nextAttempt = attemptSchema.parse({
+      ...attempt,
+      assistance: [
+        ...attempt.assistance,
+        { questionId, mode: "review", usedAt: new Date().toISOString() },
+      ],
+      updatedAt: new Date().toISOString(),
+    });
+    setAttempt(nextAttempt);
+    void putAttempt(nextAttempt);
+  }
 
   if (attempt === undefined) return <div className="reading-state" role="status">正在汇总本地成绩…</div>;
   if (attempt === null) {
@@ -89,7 +120,13 @@ export function AttemptResults({ attemptId }: { attemptId: string }) {
             .map((option) => `${option.id}. ${option.text}`)
             .join("；");
           return (
-            <details key={question.id} className="result-item" data-state={state}>
+            <details
+              id={`question-${question.id}`}
+              key={question.id}
+              className="result-item"
+              data-state={state}
+              open={question.id === highlightedQuestionId || undefined}
+            >
               <summary>
                 <span>{String(index + 1).padStart(2, "0")}</span>
                 <div>
@@ -126,6 +163,9 @@ export function AttemptResults({ attemptId }: { attemptId: string }) {
                   <strong>原文证据 · {question.source.locator}</strong>
                   <p>{question.source.excerpt}</p>
                 </blockquote>
+                <button className="tutor-review-button" type="button" onClick={() => setTutorQuestionId(question.id)}>
+                  问 AI：为什么是这个答案？ →
+                </button>
               </div>
             </details>
           );
@@ -136,6 +176,20 @@ export function AttemptResults({ attemptId }: { attemptId: string }) {
         <Link className="button button--secondary" href={`/quiz/${attempt.quizId}`}>再测一次</Link>
         <Link className="button button--primary" href="/history">查看练习记录 →</Link>
       </div>
+      {tutorQuestionId ? (() => {
+        const tutorQuestion = attempt.quizSnapshot.questions.find((item) => item.id === tutorQuestionId);
+        if (!tutorQuestion) return null;
+        return (
+          <TutorPanel
+            attempt={attempt}
+            question={tutorQuestion}
+            result={attempt.results[tutorQuestion.id] ?? null}
+            mode="review"
+            onClose={() => setTutorQuestionId("")}
+            onUsed={() => recordAssistance(tutorQuestion.id)}
+          />
+        );
+      })() : null}
     </section>
   );
 }
