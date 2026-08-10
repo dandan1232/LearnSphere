@@ -19,6 +19,7 @@ import {
 import { AiError, createChatCompletion } from "@/lib/server/ai-client";
 
 const MAX_CONTEXT_CHARACTERS = 72_000;
+const MAX_GENERATION_ATTEMPTS = 2;
 
 const generatedQuestionSchema = z.object({
   type: questionTypeSchema,
@@ -45,6 +46,37 @@ const generatedQuizSchema = z.object({
 });
 
 type GeneratedQuestion = z.infer<typeof generatedQuestionSchema>;
+type ChatCompletion = typeof createChatCompletion;
+
+const generatedFieldLabels: Record<string, string> = {
+  title: "题库标题",
+  questions: "题目列表",
+  type: "题型",
+  prompt: "题干",
+  options: "选项",
+  correctOptionIds: "正确答案",
+  referenceAnswer: "参考答案",
+  rubric: "评分标准",
+  explanation: "答案解析",
+  difficulty: "难度",
+  knowledgeTags: "知识点标签",
+  sectionId: "原文章节标识",
+};
+
+function describeGeneratedQuizIssues(error: z.ZodError) {
+  const fields = error.issues.map((issue) => {
+    const questionIndex = issue.path[0] === "questions" && typeof issue.path[1] === "number"
+      ? issue.path[1]
+      : null;
+    const rawField = String(issue.path.at(-1) ?? "questions");
+    const field = generatedFieldLabels[rawField] ?? rawField;
+    return questionIndex === null ? field : `第 ${questionIndex + 1} 题的${field}`;
+  });
+  const uniqueFields = [...new Set(fields)];
+  const visibleFields = uniqueFields.slice(0, 6).join("、");
+  const remainder = uniqueFields.length > 6 ? `等 ${uniqueFields.length} 处` : "";
+  return `${visibleFields}${remainder}`;
+}
 
 function requestedCount(config: QuizConfig, type: keyof QuizConfig["counts"]) {
   return config.counts[type];
@@ -208,7 +240,12 @@ export function normalizeGeneratedQuiz(
 ): Quiz {
   const parsedDraft = generatedQuizSchema.safeParse(raw);
   if (!parsedDraft.success) {
-    throw new AiError("INVALID_RESPONSE", "模型返回的题库结构不完整，请重新生成。", 502);
+    const details = describeGeneratedQuizIssues(parsedDraft.error);
+    throw new AiError(
+      "INVALID_RESPONSE",
+      `模型返回的题库字段不完整或格式错误：${details}。`,
+      502,
+    );
   }
   const draft = parsedDraft.data;
   const selected = selectRequestedQuestions(draft.questions, config);
@@ -293,10 +330,21 @@ Source title: ${source.title}
 ${context}`;
 }
 
+function retryInstruction(error: AiError) {
+  return `\n\nThe previous generation failed strict validation: ${error.message}
+Generate a complete replacement JSON object from scratch.
+- Include every field shown in the required shape for every question.
+- Use [] for non-applicable arrays and "" for non-applicable strings; never omit a field.
+- Match every requested question count exactly.
+- Copy sectionId exactly from a supplied source_section.
+- Return JSON only, with no Markdown or commentary.`;
+}
+
 export async function generateQuiz(
   provider: AiProviderCredentials,
   sourceInput: unknown,
   configInput: unknown,
+  completion: ChatCompletion = createChatCompletion,
 ) {
   const source = sourceDocumentSchema.parse(sourceInput);
   const config = quizConfigSchema.parse(configInput);
@@ -310,13 +358,35 @@ export async function generateQuiz(
     throw new AiError("INVALID_RESPONSE", "原文内容太少，无法生成可靠题目。", 400);
   }
 
-  const content = await createChatCompletion(provider, {
-    messages: [
-      { role: "system", content: generationSystemPrompt() },
-      { role: "user", content: generationUserPrompt(source, config, context) },
-    ],
-    maxTokens: Math.min(16_000, 2500 + totalQuestions * 700),
-    temperature: 0.25,
-  });
-  return normalizeGeneratedQuiz(extractJsonObject(content), source, config);
+  const systemPrompt = generationSystemPrompt();
+  const userPrompt = generationUserPrompt(source, config, context);
+  const maxTokens = Math.min(16_000, 2500 + totalQuestions * 700);
+  let validationError: AiError | null = null;
+
+  for (let attempt = 0; attempt < MAX_GENERATION_ATTEMPTS; attempt += 1) {
+    const content = await completion(provider, {
+      messages: [
+        { role: "system", content: systemPrompt },
+        {
+          role: "user",
+          content: validationError ? `${userPrompt}${retryInstruction(validationError)}` : userPrompt,
+        },
+      ],
+      maxTokens,
+      temperature: attempt === 0 ? 0.25 : 0,
+    });
+
+    try {
+      return normalizeGeneratedQuiz(extractJsonObject(content), source, config);
+    } catch (error) {
+      if (!(error instanceof AiError) || error.code !== "INVALID_RESPONSE") throw error;
+      validationError = error;
+    }
+  }
+
+  throw new AiError(
+    "INVALID_RESPONSE",
+    `模型已自动重试一次，但返回内容仍未通过校验：${validationError?.message ?? "题库格式错误"}`,
+    502,
+  );
 }

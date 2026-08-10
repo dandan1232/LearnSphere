@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
+import type { AiProviderCredentials } from "@/lib/ai/contracts";
 import type { QuizConfig, SourceDocument } from "@/lib/domain/models";
-import { AiError } from "@/lib/server/ai-client";
-import { buildSourceContext, normalizeGeneratedQuiz } from "@/lib/server/quiz-generator";
+import { AiError, createChatCompletion } from "@/lib/server/ai-client";
+import { buildSourceContext, generateQuiz, normalizeGeneratedQuiz } from "@/lib/server/quiz-generator";
 
 const source: SourceDocument = {
   schemaVersion: 1,
@@ -45,6 +46,12 @@ const config: QuizConfig = {
   counts: { single: 1, multiple: 0, boolean: 0, short: 1 },
   difficulty: "mixed",
   outputLanguage: "zh-CN",
+};
+
+const provider: AiProviderCredentials = {
+  baseUrl: "https://api.example.com/v1",
+  model: "quiz-model",
+  apiKey: "test-key",
 };
 
 function validDraft() {
@@ -115,8 +122,44 @@ describe("quiz generation normalization", () => {
 
   it("converts malformed model output into a provider response error", () => {
     expect(() => normalizeGeneratedQuiz({ title: "缺少题目" }, source, config)).toThrowError(
-      expect.objectContaining({ code: "INVALID_RESPONSE", status: 502 }),
+      expect.objectContaining({
+        code: "INVALID_RESPONSE",
+        status: 502,
+        message: expect.stringContaining("题目列表"),
+      }),
     );
+  });
+
+  it("regenerates once with strict repair instructions after an incomplete response", async () => {
+    const completion = vi.fn<typeof createChatCompletion>()
+      .mockResolvedValueOnce(JSON.stringify({
+        title: "字段不完整的题库",
+        questions: [{ type: "single", prompt: "智能体先做什么？" }],
+      }))
+      .mockResolvedValueOnce(JSON.stringify(validDraft()));
+
+    const quiz = await generateQuiz(provider, source, config, completion);
+
+    expect(quiz.questions).toHaveLength(2);
+    expect(completion).toHaveBeenCalledTimes(2);
+    expect(completion.mock.calls[1][1].temperature).toBe(0);
+    expect(completion.mock.calls[1][1].messages.at(-1)?.content).toContain("第 1 题的答案解析");
+    expect(completion.mock.calls[1][1].messages.at(-1)?.content).toContain("never omit a field");
+  });
+
+  it("returns actionable field details when the repair attempt also fails", async () => {
+    const incomplete = JSON.stringify({
+      title: "字段不完整的题库",
+      questions: [{ type: "single", prompt: "智能体先做什么？" }],
+    });
+    const completion = vi.fn<typeof createChatCompletion>().mockResolvedValue(incomplete);
+
+    await expect(generateQuiz(provider, source, config, completion)).rejects.toMatchObject({
+      code: "INVALID_RESPONSE",
+      status: 502,
+      message: expect.stringMatching(/已自动重试一次.*第 1 题的答案解析/),
+    });
+    expect(completion).toHaveBeenCalledTimes(2);
   });
 });
 
