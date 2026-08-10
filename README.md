@@ -62,6 +62,7 @@ npm run verify
 - `Dockerfile` 与 `deploy/docker-compose.yml`：推荐方式，应用以非 root 用户运行并仅绑定 `127.0.0.1:3100`。
 - `deploy/learnsphere.service`：无 Docker 环境的备用方式，让应用以 `ubuntu` 用户在 `127.0.0.1:3100` 运行。
 - `deploy/nginx-http.conf`：Nginx 反向代理与证书签发前的 HTTP 配置。
+- `deploy/openresty-1panel.conf` 与 `deploy/openresty-proxy.conf`：已有 1Panel OpenResty 服务器的站点配置。
 - `deploy/deploy.sh`：拉取 `main`、安装锁定依赖、执行完整验证并重启服务。
 
 首次部署示例：
