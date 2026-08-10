@@ -10,7 +10,7 @@ Group=ubuntu
 WorkingDirectory=/home/ubuntu/learn-sphere
 Environment=NODE_ENV=production
 Environment=NEXT_TELEMETRY_DISABLED=1
-ExecStart=/usr/bin/npm run start -- -H 127.0.0.1 -p 3000
+ExecStart=/usr/bin/npm run start -- -H 127.0.0.1 -p 3100
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=20

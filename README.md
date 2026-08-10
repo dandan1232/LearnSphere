@@ -57,9 +57,10 @@ npm run verify
 
 ## 生产部署
 
-仓库提供了 Ubuntu + systemd + Nginx 的部署基线：
+仓库提供 Docker Compose，以及 Ubuntu + systemd + Nginx 两种部署基线：
 
-- `deploy/learnsphere.service`：让应用以 `ubuntu` 用户在 `127.0.0.1:3000` 运行。
+- `Dockerfile` 与 `deploy/docker-compose.yml`：推荐方式，应用以非 root 用户运行并仅绑定 `127.0.0.1:3100`。
+- `deploy/learnsphere.service`：无 Docker 环境的备用方式，让应用以 `ubuntu` 用户在 `127.0.0.1:3100` 运行。
 - `deploy/nginx-http.conf`：Nginx 反向代理与证书签发前的 HTTP 配置。
 - `deploy/deploy.sh`：拉取 `main`、安装锁定依赖、执行完整验证并重启服务。
 
@@ -67,17 +68,14 @@ npm run verify
 
 ```bash
 sudo apt update
-sudo apt install -y nginx certbot python3-certbot-nginx git
+sudo apt install -y nginx certbot python3-certbot-nginx git docker.io docker-compose-plugin
 git clone https://github.com/dandan1232/LearnSphere.git /home/ubuntu/learn-sphere
 cd /home/ubuntu/learn-sphere
-npm ci
-npm run verify
-sudo cp deploy/learnsphere.service /etc/systemd/system/learnsphere.service
+docker compose -f deploy/docker-compose.yml up --detach --build
 sudo cp deploy/nginx-http.conf /etc/nginx/sites-available/learnsphere
 sudo ln -s /etc/nginx/sites-available/learnsphere /etc/nginx/sites-enabled/learnsphere
 sudo nginx -t
-sudo systemctl daemon-reload
-sudo systemctl enable --now learnsphere nginx
+sudo systemctl enable --now nginx
 sudo certbot --nginx -d learnsphere.nianan.ggff.net --redirect
 ```
 
