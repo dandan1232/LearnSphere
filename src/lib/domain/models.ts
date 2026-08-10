@@ -32,6 +32,15 @@ export const sourceDocumentSchema = z.object({
   importedAt: z.iso.datetime(),
 });
 
+export const sourceInspectionSchema = z.object({
+  originalUrl: z.url(),
+  title: z.string().min(1),
+  language: z.string().min(2).max(16),
+  adapter: sourceDocumentSchema.shape.adapter,
+  chapters: z.array(sourceChapterSchema).min(1),
+  sections: z.array(sourceSectionSchema),
+});
+
 export const optionSchema = z.object({
   id: z.string().min(1),
   text: z.string().min(1),
@@ -165,6 +174,7 @@ export const tutorThreadSchema = z.object({
 export type SourceChapter = z.infer<typeof sourceChapterSchema>;
 export type SourceSection = z.infer<typeof sourceSectionSchema>;
 export type SourceDocument = z.infer<typeof sourceDocumentSchema>;
+export type SourceInspection = z.infer<typeof sourceInspectionSchema>;
 export type Question = z.infer<typeof questionSchema>;
 export type QuizConfig = z.infer<typeof quizConfigSchema>;
 export type Quiz = z.infer<typeof quizSchema>;
