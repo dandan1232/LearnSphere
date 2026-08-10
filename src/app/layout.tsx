@@ -1,7 +1,23 @@
 import type { Metadata, Viewport } from "next";
+import { Fredoka, Noto_Sans_SC } from "next/font/google";
 import type { ReactNode } from "react";
 
+import { AppShell } from "@/components/app-shell";
+import { ThemeProvider } from "@/components/theme-provider";
+
 import "./globals.css";
+
+const bodyFont = Noto_Sans_SC({
+  variable: "--font-body",
+  display: "swap",
+  preload: false,
+});
+
+const displayFont = Fredoka({
+  variable: "--font-display",
+  subsets: ["latin"],
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: {
@@ -21,7 +37,19 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="zh-CN" suppressHydrationWarning>
-      <body>{children}</body>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{const s=JSON.parse(localStorage.getItem('learnsphere.settings.v1')||'{}');const t=s.theme==='dark'||s.theme==='light'?s.theme:(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;document.documentElement.style.colorScheme=t}catch{}",
+          }}
+        />
+      </head>
+      <body className={`${bodyFont.variable} ${displayFont.variable}`}>
+        <ThemeProvider>
+          <AppShell>{children}</AppShell>
+        </ThemeProvider>
+      </body>
     </html>
   );
 }
