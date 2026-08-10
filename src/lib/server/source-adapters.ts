@@ -321,6 +321,13 @@ export async function loadSelectedSource(
 ): Promise<SourceDocument> {
   const sectionGroups = await Promise.all(selectedChapters.map(loadChapter));
   const sections = sectionGroups.flat();
+  if (sections.length === 0) {
+    throw new SourceError("EMPTY_CONTENT", "选中的章节没有可用于出题的正文。", 422);
+  }
+  const totalCharacters = sections.reduce((sum, section) => sum + section.text.length, 0);
+  if (totalCharacters > 1_500_000) {
+    throw new SourceError("CONTENT_TOO_LARGE", "所选章节合计内容过长，请减少章节后重试。", 413);
+  }
   const contentHash = createHash("sha256")
     .update(sections.map((section) => `${section.locator}\n${section.text}`).join("\n\n"))
     .digest("hex");
