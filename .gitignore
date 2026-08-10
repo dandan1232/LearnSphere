@@ -8,6 +8,7 @@ build/
 coverage/
 .next/
 .nuxt/
+*.tsbuildinfo
 
 # Environment and secrets
 .env
