@@ -15,6 +15,7 @@ import {
 
 interface AiSettingsFormProps {
   returnSourceId: string;
+  returnAttemptId: string;
 }
 
 interface StoredProviderSnapshot {
@@ -44,7 +45,15 @@ async function readError(response: Response) {
   }
 }
 
-function SettingsFields({ initial, returnSourceId }: { initial: StoredProviderSnapshot; returnSourceId: string }) {
+function SettingsFields({
+  initial,
+  returnSourceId,
+  returnAttemptId,
+}: {
+  initial: StoredProviderSnapshot;
+  returnSourceId: string;
+  returnAttemptId: string;
+}) {
   const router = useRouter();
   const [baseUrl, setBaseUrl] = useState(initial.settings.provider.baseUrl);
   const [model, setModel] = useState(initial.settings.provider.model);
@@ -112,6 +121,7 @@ function SettingsFields({ initial, returnSourceId }: { initial: StoredProviderSn
     if (!save()) return;
     setMessage({ kind: "success", text: "模型设置已保存在当前浏览器。" });
     if (returnSourceId) router.push(`/learn/${returnSourceId}/configure`);
+    else if (returnAttemptId) router.push(`/attempt/${returnAttemptId}`);
   }
 
   return (
@@ -185,15 +195,22 @@ function SettingsFields({ initial, returnSourceId }: { initial: StoredProviderSn
           {testing ? "正在连接模型…" : "测试连接"}
         </button>
         <button className="button button--primary" type="submit">
-          {returnSourceId ? "保存并继续设置题目" : "保存模型设置"}
+          {returnSourceId ? "保存并继续设置题目" : returnAttemptId ? "保存并返回评分" : "保存模型设置"}
         </button>
       </div>
     </form>
   );
 }
 
-export function AiSettingsForm({ returnSourceId }: AiSettingsFormProps) {
+export function AiSettingsForm({ returnSourceId, returnAttemptId }: AiSettingsFormProps) {
   const snapshot = useSyncExternalStore(subscribeToBrowserStorage, getBrowserSnapshot, getServerSnapshot);
   const initial = JSON.parse(snapshot) as StoredProviderSnapshot;
-  return <SettingsFields key={snapshot} initial={initial} returnSourceId={returnSourceId} />;
+  return (
+    <SettingsFields
+      key={snapshot}
+      initial={initial}
+      returnSourceId={returnSourceId}
+      returnAttemptId={returnAttemptId}
+    />
+  );
 }

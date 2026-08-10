@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     await testAiConnection(provider);
     return Response.json({ ok: true });
   } catch (error) {
-    if (error instanceof z.ZodError) {
+    if (error instanceof z.ZodError || error instanceof SyntaxError) {
       return Response.json(
         { error: { code: "INVALID_INPUT", message: "请完整填写 HTTPS 接口地址、模型名称和 API Key。" } },
         { status: 400 },

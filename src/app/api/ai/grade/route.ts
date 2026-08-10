@@ -1,28 +1,28 @@
 import { z } from "zod";
 
 import { aiProviderCredentialsSchema } from "@/lib/ai/contracts";
-import { quizConfigSchema, sourceDocumentSchema } from "@/lib/domain/models";
+import { learnerAnswerSchema, quizSchema } from "@/lib/domain/models";
 import { AiError } from "@/lib/server/ai-client";
-import { generateQuiz } from "@/lib/server/quiz-generator";
+import { gradeShortAnswers } from "@/lib/server/short-answer-grader";
 import { SourceError } from "@/lib/server/source-errors";
 
 export const runtime = "nodejs";
 
 const requestSchema = z.object({
   provider: aiProviderCredentialsSchema,
-  source: sourceDocumentSchema,
-  config: quizConfigSchema,
+  quiz: quizSchema,
+  answers: z.record(z.string(), learnerAnswerSchema),
 });
 
 export async function POST(request: Request) {
   try {
     const input = requestSchema.parse(await request.json());
-    const quiz = await generateQuiz(input.provider, input.source, input.config);
-    return Response.json({ quiz });
+    const results = await gradeShortAnswers(input.provider, input.quiz, input.answers);
+    return Response.json({ results });
   } catch (error) {
     if (error instanceof z.ZodError || error instanceof SyntaxError) {
       return Response.json(
-        { error: { code: "INVALID_INPUT", message: "题目设置或本地原文不完整，请返回上一步重试。" } },
+        { error: { code: "INVALID_INPUT", message: "简答题或作答记录不完整，请刷新后重试。" } },
         { status: 400 },
       );
     }
@@ -30,7 +30,7 @@ export async function POST(request: Request) {
       return Response.json({ error: { code: error.code, message: error.message } }, { status: error.status });
     }
     return Response.json(
-      { error: { code: "INTERNAL_ERROR", message: "生成题库时出现意外问题，请稍后重试。" } },
+      { error: { code: "INTERNAL_ERROR", message: "简答评分出现意外问题，请稍后重试。" } },
       { status: 500 },
     );
   }

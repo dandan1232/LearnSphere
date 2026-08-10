@@ -110,7 +110,7 @@ export function HomeDashboard() {
           <ul className="attempt-list">
             {attempts.map((attempt) => (
               <li key={attempt.id}>
-                <Link href={`/quiz/${attempt.id}`}>
+                <Link href={attempt.status === "completed" ? `/attempt/${attempt.id}/results` : `/attempt/${attempt.id}`}>
                   <span className="attempt-list__score">
                     {attempt.score === null ? "—" : Math.round(attempt.score)}
                   </span>

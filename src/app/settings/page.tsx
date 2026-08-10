@@ -6,6 +6,8 @@ export default async function SettingsPage(props: PageProps<"/settings">) {
   const searchParams = await props.searchParams;
   const rawSource = searchParams.source;
   const returnSourceId = Array.isArray(rawSource) ? rawSource[0] : rawSource;
+  const rawAttempt = searchParams.attempt;
+  const returnAttemptId = Array.isArray(rawAttempt) ? rawAttempt[0] : rawAttempt;
 
   return (
     <div className="settings-layout">
@@ -19,7 +21,7 @@ export default async function SettingsPage(props: PageProps<"/settings">) {
         <span>默认关闭浏览器即清除</span>
         <span>支持随时替换模型</span>
       </aside>
-      <AiSettingsForm returnSourceId={returnSourceId ?? ""} />
+      <AiSettingsForm returnSourceId={returnSourceId ?? ""} returnAttemptId={returnAttemptId ?? ""} />
     </div>
   );
 }
