@@ -130,6 +130,18 @@ describe("quiz generation normalization", () => {
     );
   });
 
+  it("rejects whitespace-only model fields before constructing the final quiz", () => {
+    const draft = validDraft();
+    draft.questions[0].explanation = "    ";
+
+    expect(() => normalizeGeneratedQuiz(draft, source, config)).toThrowError(
+      expect.objectContaining({
+        code: "INVALID_RESPONSE",
+        message: expect.stringContaining("第 1 题的答案解析"),
+      }),
+    );
+  });
+
   it("regenerates once with strict repair instructions after an incomplete response", async () => {
     const completion = vi.fn<typeof createChatCompletion>()
       .mockResolvedValueOnce(JSON.stringify({
@@ -160,6 +172,45 @@ describe("quiz generation normalization", () => {
       message: expect.stringMatching(/已自动重试一次.*第 1 题的答案解析/),
     });
     expect(completion).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps every rubric criterion valid when many short answers split a small score", () => {
+    const shortHeavyConfig: QuizConfig = {
+      preset: "custom",
+      counts: { single: 0, multiple: 0, boolean: 0, short: 10 },
+      difficulty: "mixed",
+      outputLanguage: "zh-CN",
+    };
+    const draft = {
+      title: "简答题边界测验",
+      questions: Array.from({ length: 10 }, (_value, index) => ({
+        type: "short",
+        prompt: `说明智能体知识点 ${index + 1} 的作用。`,
+        options: [],
+        correctOptionIds: [],
+        referenceAnswer: "根据原文章节说明相关知识点。",
+        rubric: [
+          { description: "核心概念准确", weight: 10 },
+          { description: "作用说明完整", weight: 10 },
+          { description: "关联原文证据", weight: 10 },
+          { description: "表达逻辑清晰", weight: 10 },
+          { description: "补充边界条件", weight: 1 },
+        ],
+        explanation: "答案需要覆盖概念、作用、证据与边界。",
+        difficulty: "medium",
+        knowledgeTags: [`知识点 ${index + 1}`],
+        sectionId: index % 2 === 0 ? "section-observe" : "section-memory",
+      })),
+    };
+
+    const quiz = normalizeGeneratedQuiz(draft, source, shortHeavyConfig);
+
+    expect(quiz.questions).toHaveLength(10);
+    expect(quiz.questions.flatMap((question) => question.rubric).every((criterion) => criterion.points > 0)).toBe(true);
+    for (const question of quiz.questions) {
+      expect(question.rubric.reduce((sum, criterion) => sum + criterion.points, 0)).toBeCloseTo(question.points, 8);
+    }
+    expect(quiz.questions.reduce((sum, question) => sum + question.points, 0)).toBe(100);
   });
 });
 

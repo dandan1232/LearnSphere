@@ -20,28 +20,36 @@ import { AiError, createChatCompletion } from "@/lib/server/ai-client";
 
 const MAX_CONTEXT_CHARACTERS = 72_000;
 const MAX_GENERATION_ATTEMPTS = 2;
+const SCORE_PRECISION = 100;
+const MIN_RUBRIC_POINTS = 0.25;
 
 const generatedQuestionSchema = z.object({
   type: questionTypeSchema,
-  prompt: z.string().min(4).max(1200),
+  prompt: z.string().trim().min(4).max(1200),
   options: z
-    .array(z.object({ id: z.string().min(1).max(10), text: z.string().min(1).max(600) }))
+    .array(z.object({
+      id: z.string().trim().min(1).max(10),
+      text: z.string().trim().min(1).max(600),
+    }))
     .max(8)
     .default([]),
-  correctOptionIds: z.array(z.string().min(1).max(10)).max(8).default([]),
-  referenceAnswer: z.string().max(5000).default(""),
+  correctOptionIds: z.array(z.string().trim().min(1).max(10)).max(8).default([]),
+  referenceAnswer: z.string().trim().max(5000).default(""),
   rubric: z
-    .array(z.object({ description: z.string().min(2).max(500), weight: z.number().int().min(1).max(10) }))
+    .array(z.object({
+      description: z.string().trim().min(2).max(500),
+      weight: z.number().int().min(1).max(10),
+    }))
     .max(8)
     .default([]),
-  explanation: z.string().min(4).max(4000),
+  explanation: z.string().trim().min(4).max(4000),
   difficulty: difficultySchema,
-  knowledgeTags: z.array(z.string().min(1).max(80)).min(1).max(6),
-  sectionId: z.string().min(1),
+  knowledgeTags: z.array(z.string().trim().min(1).max(80)).min(1).max(6),
+  sectionId: z.string().trim().min(1),
 });
 
 const generatedQuizSchema = z.object({
-  title: z.string().min(2).max(200),
+  title: z.string().trim().min(2).max(200),
   questions: z.array(generatedQuestionSchema).min(1).max(60),
 });
 
@@ -61,6 +69,7 @@ const generatedFieldLabels: Record<string, string> = {
   difficulty: "难度",
   knowledgeTags: "知识点标签",
   sectionId: "原文章节标识",
+  points: "分值",
 };
 
 function describeGeneratedQuizIssues(error: z.ZodError) {
@@ -78,6 +87,29 @@ function describeGeneratedQuizIssues(error: z.ZodError) {
   return `${visibleFields}${remainder}`;
 }
 
+function describeFinalQuizIssues(error: z.ZodError) {
+  return error.issues
+    .slice(0, 4)
+    .map((issue) => {
+      const parts: string[] = [];
+      for (let index = 0; index < issue.path.length; index += 1) {
+        const segment = issue.path[index];
+        const next = issue.path[index + 1];
+        if (segment === "questions" && typeof next === "number") {
+          parts.push(`第 ${next + 1} 题`);
+          index += 1;
+        } else if (segment === "rubric" && typeof next === "number") {
+          parts.push(`评分标准第 ${next + 1} 项`);
+          index += 1;
+        } else {
+          parts.push(generatedFieldLabels[String(segment)] ?? String(segment));
+        }
+      }
+      return `${parts.join(" / ")}：${issue.message}`;
+    })
+    .join("；");
+}
+
 function requestedCount(config: QuizConfig, type: keyof QuizConfig["counts"]) {
   return config.counts[type];
 }
@@ -90,19 +122,26 @@ function allocateIntegerPoints(count: number, total: number) {
 }
 
 function allocateWeightedPoints(weights: number[], total: number) {
+  if (weights.length === 0) return [];
+  const totalUnits = Math.round(total * SCORE_PRECISION);
+  const minimumUnits = Math.min(
+    Math.round(MIN_RUBRIC_POINTS * SCORE_PRECISION),
+    Math.floor(totalUnits / weights.length),
+  );
+  const distributableUnits = totalUnits - minimumUnits * weights.length;
   const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
-  const raw = weights.map((weight) => (weight / totalWeight) * total);
-  const points = raw.map(Math.floor);
-  let remainder = total - points.reduce((sum, point) => sum + point, 0);
+  const raw = weights.map((weight) => (weight / totalWeight) * distributableUnits);
+  const pointUnits = raw.map((value) => minimumUnits + Math.floor(value));
+  let remainder = totalUnits - pointUnits.reduce((sum, point) => sum + point, 0);
   const order = raw
     .map((value, index) => ({ index, fraction: value - Math.floor(value) }))
     .toSorted((left, right) => right.fraction - left.fraction);
   for (const entry of order) {
     if (remainder <= 0) break;
-    points[entry.index] += 1;
+    pointUnits[entry.index] += 1;
     remainder -= 1;
   }
-  return points;
+  return pointUnits.map((units) => units / SCORE_PRECISION);
 }
 
 function extractJsonObject(content: string) {
@@ -260,9 +299,10 @@ export function normalizeGeneratedQuiz(
 
   const objectiveCount = selected.filter((question) => question.type !== "short").length;
   const shortCount = selected.length - objectiveCount;
-  const objectiveTotal = shortCount > 0 ? 70 : 100;
+  const objectiveTotal = objectiveCount === 0 ? 0 : shortCount > 0 ? 70 : 100;
+  const shortTotal = shortCount === 0 ? 0 : objectiveCount > 0 ? 30 : 100;
   const objectivePoints = allocateIntegerPoints(objectiveCount, objectiveTotal);
-  const shortPoints = allocateIntegerPoints(shortCount, shortCount > 0 ? 30 : 0);
+  const shortPoints = allocateIntegerPoints(shortCount, shortTotal);
   let objectiveIndex = 0;
   let shortIndex = 0;
   const questions = selected.map((question) => {
@@ -282,7 +322,11 @@ export function normalizeGeneratedQuiz(
     createdAt: new Date().toISOString(),
   });
   if (!parsedQuiz.success) {
-    throw new AiError("INVALID_RESPONSE", "生成的题库未通过完整性校验，请重新生成。", 502);
+    throw new AiError(
+      "INVALID_RESPONSE",
+      `生成的题库未通过内部完整性校验：${describeFinalQuizIssues(parsedQuiz.error)}。`,
+      502,
+    );
   }
   return parsedQuiz.data;
 }
