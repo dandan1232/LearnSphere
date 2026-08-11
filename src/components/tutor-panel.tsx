@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, type KeyboardEvent, type MouseEvent, useEffect, useRef, useState } from "react";
 
 import { MarkdownContent } from "@/components/markdown-content";
 import {
@@ -39,6 +39,22 @@ export function TutorPanel({ attempt, question, result, mode, onClose, onUsed }:
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+
+    function handleEscape(event: globalThis.KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [onClose]);
 
   useEffect(() => {
     let active = true;
@@ -135,12 +151,16 @@ export function TutorPanel({ attempt, question, result, mode, onClose, onUsed }:
     event.currentTarget.form?.requestSubmit();
   }
 
+  function handleBackdropClick(event: MouseEvent<HTMLDivElement>) {
+    if (event.target === event.currentTarget) onClose();
+  }
+
   const suggestions = mode === "guided"
     ? ["给我一个思考方向", "我应该回原文看哪个概念？"]
     : ["为什么正确答案是这个？", "我的理解具体错在哪里？"];
 
   return (
-    <div className="tutor-backdrop">
+    <div className="tutor-backdrop" onClick={handleBackdropClick}>
       <aside className="tutor-panel" role="dialog" aria-modal="true" aria-labelledby="tutor-title">
         <header className="tutor-panel__header">
           <div>

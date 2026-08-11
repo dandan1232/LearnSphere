@@ -126,4 +126,34 @@ describe("TutorPanel", () => {
     };
     expect(request.input.userMessage).toBe("第一行\n第二行");
   });
+
+  it("closes from the backdrop or Escape without closing from panel clicks", async () => {
+    const onClose = vi.fn();
+    const { container, unmount } = render(
+      <TutorPanel
+        attempt={attempt}
+        question={attempt.quizSnapshot.questions[0]}
+        result={null}
+        mode="guided"
+        onClose={onClose}
+        onUsed={vi.fn()}
+      />,
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(dialog);
+    expect(onClose).not.toHaveBeenCalled();
+
+    const backdrop = container.querySelector(".tutor-backdrop");
+    expect(backdrop).not.toBeNull();
+    fireEvent.click(backdrop!);
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(2);
+
+    expect(document.body.style.overflow).toBe("hidden");
+    unmount();
+    expect(document.body.style.overflow).toBe("");
+  });
 });
