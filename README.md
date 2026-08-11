@@ -1,4 +1,4 @@
-# LearnSphere
+<img width="1920" height="911" alt="image" src="https://github.com/user-attachments/assets/47e23c59-e146-4aa2-a001-0a450e675a12" /><img width="1920" height="911" alt="image" src="https://github.com/user-attachments/assets/2d6d7fed-276c-4d30-a14a-4a16073eeee9" /># LearnSphere
 
 LearnSphere 是一个本地优先的 AI 主动回忆学习工具：粘贴公开技术文档或在线书籍链接，选择章节，生成混合题型测验，并在答题后获得可追溯的评分、原文证据和上下文 AI 讲解。
 
@@ -6,11 +6,30 @@ LearnSphere 是一个本地优先的 AI 主动回忆学习工具：粘贴公开�
 
 ## 产品预览
 
-![LearnSphere 学习台](./public/screenshots/learnsphere-home.png)
+<img width="1920" height="989" alt="image" src="https://github.com/user-attachments/assets/9e8e621f-4b7a-4ff3-a469-fa43a01cbc6b" />
+
 
 从公开链接识别书籍目录，选择本次真正要掌握的章节：
 
-![LearnSphere 章节选择](./public/screenshots/learnsphere-source.png)
+
+<img width="1920" height="911" alt="image" src="https://github.com/user-attachments/assets/1a4b2305-bf9c-4869-877b-38a82372e96e" />
+
+<img width="1920" height="911" alt="image" src="https://github.com/user-attachments/assets/3e40b89a-9a65-4add-8cf5-dd89ea4620c6" />
+
+<img width="1920" height="911" alt="image" src="https://github.com/user-attachments/assets/4d460496-7603-4b39-bff4-a51477537c24" />
+
+<img width="1920" height="911" alt="image" src="https://github.com/user-attachments/assets/c37d3d1b-1c7e-4c5d-9f8d-68444dc9c07e" />
+
+<img width="1920" height="911" alt="image" src="https://github.com/user-attachments/assets/2f9705b5-11b3-4d3b-b4cd-125c1c50551e" />
+
+<img width="1920" height="911" alt="image" src="https://github.com/user-attachments/assets/c02751de-73df-414a-95ab-b5048d457793" />
+
+<img width="1920" height="911" alt="image" src="https://github.com/user-attachments/assets/3f4d1142-c635-4829-a5fc-b2d7720ba395" />
+
+<img width="1920" height="911" alt="image" src="https://github.com/user-attachments/assets/c848d4df-2810-437d-b9b1-be7a38a08ff8" />
+
+<img width="1920" height="911" alt="image" src="https://github.com/user-attachments/assets/1c6e48d1-712c-4c80-ae7a-5c5698428b8f" />
+
 
 ## 已实现能力
 
