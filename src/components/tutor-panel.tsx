@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
 
+import { MarkdownContent } from "@/components/markdown-content";
 import {
   tutorThreadSchema,
   type Attempt,
@@ -64,9 +65,8 @@ export function TutorPanel({ attempt, question, result, mode, onClose, onUsed }:
     };
   }, [attempt.id, question.id, threadId]);
 
-  async function ask(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const message = draft.trim();
+  async function sendMessage(rawMessage: string) {
+    const message = rawMessage.trim();
     if (!message || !thread || pending) return;
     const provider = loadAppSettings().provider;
     const apiKey = loadApiKey();
@@ -124,6 +124,17 @@ export function TutorPanel({ attempt, question, result, mode, onClose, onUsed }:
     }
   }
 
+  function ask(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    void sendMessage(draft);
+  }
+
+  function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+    event.preventDefault();
+    event.currentTarget.form?.requestSubmit();
+  }
+
   const suggestions = mode === "guided"
     ? ["给我一个思考方向", "我应该回原文看哪个概念？"]
     : ["为什么正确答案是这个？", "我的理解具体错在哪里？"];
@@ -148,7 +159,7 @@ export function TutorPanel({ attempt, question, result, mode, onClose, onUsed }:
           {thread?.messages.length ? thread.messages.map((message) => (
             <div key={message.id} className="tutor-message" data-role={message.role}>
               <span>{message.role === "user" ? "你" : "AI 导师"}</span>
-              <p>{message.content}</p>
+              <MarkdownContent content={message.content} />
             </div>
           )) : (
             <div className="tutor-empty">
@@ -161,7 +172,15 @@ export function TutorPanel({ attempt, question, result, mode, onClose, onUsed }:
 
         <div className="tutor-suggestions" aria-label="快捷问题">
           {suggestions.map((suggestion) => (
-            <button key={suggestion} type="button" onClick={() => setDraft(suggestion)}>{suggestion}</button>
+            <button
+              key={suggestion}
+              type="button"
+              disabled={pending || !thread}
+              onClick={() => void sendMessage(suggestion)}
+            >
+              {suggestion}
+              <span aria-hidden="true">↗</span>
+            </button>
           ))}
         </div>
 
@@ -179,6 +198,7 @@ export function TutorPanel({ attempt, question, result, mode, onClose, onUsed }:
             id="tutor-question"
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={handleComposerKeyDown}
             placeholder="问问为什么、哪里理解错了…"
             rows={3}
             maxLength={4000}
@@ -186,6 +206,7 @@ export function TutorPanel({ attempt, question, result, mode, onClose, onUsed }:
           <button className="button button--primary" type="submit" disabled={pending || !draft.trim()}>
             {pending ? "正在回答…" : "发送问题 →"}
           </button>
+          <small className="tutor-composer__hint">Enter 发送 · Shift + Enter 换行</small>
         </form>
       </aside>
     </div>

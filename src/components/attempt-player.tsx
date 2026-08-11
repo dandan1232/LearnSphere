@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import { AsyncProcessStatus } from "@/components/async-process-status";
 import { TutorPanel } from "@/components/tutor-panel";
 import {
   attemptSchema,
@@ -16,6 +17,7 @@ import { getAttempt, putAttempt } from "@/lib/storage/database";
 import { loadApiKey, loadAppSettings } from "@/lib/storage/settings";
 
 const typeLabel = { single: "单选题", multiple: "多选题", boolean: "判断题", short: "简答题" } as const;
+type GradingPhase = "objective" | "short" | "summary";
 
 async function readError(response: Response) {
   try {
@@ -32,6 +34,7 @@ export function AttemptPlayer({ attemptId }: { attemptId: string }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [saving, setSaving] = useState(false);
   const [grading, setGrading] = useState(false);
+  const [gradingPhase, setGradingPhase] = useState<GradingPhase>("objective");
   const [error, setError] = useState("");
   const [tutorOpen, setTutorOpen] = useState(false);
 
@@ -123,6 +126,9 @@ export function AttemptPlayer({ attemptId }: { attemptId: string }) {
     });
     setAttempt(gradingAttempt);
     setGrading(true);
+    setGradingPhase(
+      attempt.quizSnapshot.questions.some((item) => item.type !== "short") ? "objective" : "short",
+    );
     setError("");
     await putAttempt(gradingAttempt);
 
@@ -130,6 +136,7 @@ export function AttemptPlayer({ attemptId }: { attemptId: string }) {
       let results = objectiveResults;
       const shortQuestions = attempt.quizSnapshot.questions.filter((item) => item.type === "short");
       if (shortQuestions.length > 0) {
+        setGradingPhase("short");
         if (shortQuestions.every((item) => !attempt.answers[item.id]?.text.trim())) {
           const blankResults = Object.fromEntries(
             shortQuestions.map((item) => [item.id, scoreBlankShortQuestion(item)]),
@@ -168,6 +175,7 @@ export function AttemptPlayer({ attemptId }: { attemptId: string }) {
         }
       }
 
+      setGradingPhase("summary");
       const timestamp = new Date().toISOString();
       const completed = attemptSchema.parse({
         ...gradingAttempt,
@@ -186,6 +194,7 @@ export function AttemptPlayer({ attemptId }: { attemptId: string }) {
       setAttempt(retryable);
       setError(reason instanceof Error ? reason.message : "评分失败，请稍后重试。");
       setGrading(false);
+      setGradingPhase("objective");
     }
   }
 
@@ -210,6 +219,16 @@ export function AttemptPlayer({ attemptId }: { attemptId: string }) {
   if (!question || !answer) return null;
 
   const progress = ((currentIndex + 1) / attempt.quizSnapshot.questions.length) * 100;
+  const hasObjectiveQuestions = attempt.quizSnapshot.questions.some((item) => item.type !== "short");
+  const hasShortQuestions = attempt.quizSnapshot.questions.some((item) => item.type === "short");
+  const gradingSteps = [
+    ...(hasObjectiveQuestions ? ["核对客观题"] : []),
+    ...(hasShortQuestions ? ["评阅简答题"] : []),
+    "汇总得分",
+  ];
+  const gradingActiveStep = gradingPhase === "summary"
+    ? gradingSteps.length - 1
+    : gradingSteps.indexOf(gradingPhase === "objective" ? "核对客观题" : "评阅简答题");
   return (
     <section className="attempt-player">
       <header className="attempt-topline">
@@ -235,6 +254,7 @@ export function AttemptPlayer({ attemptId }: { attemptId: string }) {
           <label className="short-answer">
             <span>你的回答</span>
             <textarea
+              aria-label="你的回答"
               value={answer.text}
               onChange={(event) => updateAnswer({ ...answer, text: event.target.value })}
               placeholder="用自己的话说明关键概念、关系或步骤…"
@@ -293,6 +313,25 @@ export function AttemptPlayer({ attemptId }: { attemptId: string }) {
           </button>
         )}
       </nav>
+      {grading ? (
+        <AsyncProcessStatus
+          eyebrow="ANSWER REVIEW"
+          title={
+            gradingPhase === "objective"
+              ? "正在核对客观题…"
+              : gradingPhase === "short"
+                ? "正在评阅简答题…"
+                : "正在汇总得分与解析…"
+          }
+          detail={
+            gradingPhase === "short"
+              ? "AI 会逐项对照评分标准，并说明得分理由。"
+              : "答案会先完成确定性计分，再合并成最终成绩。"
+          }
+          steps={gradingSteps}
+          activeStep={Math.max(0, gradingActiveStep)}
+        />
+      ) : null}
       {tutorOpen ? (
         <TutorPanel
           attempt={attempt}

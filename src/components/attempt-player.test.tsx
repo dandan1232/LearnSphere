@@ -15,6 +15,12 @@ vi.mock("@/lib/storage/database", () => ({
   getAttempt: mocks.getAttempt,
   putAttempt: mocks.putAttempt,
 }));
+vi.mock("@/lib/storage/settings", () => ({
+  loadAppSettings: () => ({
+    provider: { baseUrl: "https://api.example.com/v1", model: "study-model" },
+  }),
+  loadApiKey: () => "test-key",
+}));
 
 const attempt: Attempt = {
   schemaVersion: 1,
@@ -63,6 +69,29 @@ const attempt: Attempt = {
   completedAt: null,
 };
 
+const shortAttempt: Attempt = {
+  ...structuredClone(attempt),
+  id: "attempt-short",
+  quizId: "quiz-short",
+  quizSnapshot: {
+    ...structuredClone(attempt.quizSnapshot),
+    id: "quiz-short",
+    config: {
+      ...attempt.quizSnapshot.config,
+      counts: { single: 0, multiple: 0, boolean: 0, short: 1 },
+    },
+    questions: [{
+      ...structuredClone(attempt.quizSnapshot.questions[0]),
+      id: "question-short",
+      type: "short",
+      options: [],
+      correctOptionIds: [],
+      referenceAnswer: "应说明核心概念。",
+      rubric: [{ id: "criterion-1", description: "说明核心概念", points: 100 }],
+    }],
+  },
+};
+
 describe("AttemptPlayer", () => {
   beforeEach(() => {
     mocks.push.mockReset();
@@ -82,5 +111,19 @@ describe("AttemptPlayer", () => {
       .find((record) => record.status === "completed");
     expect(completed).toMatchObject({ score: 100, completedAt: expect.any(String) });
     expect(completed?.results["question-1"]).toMatchObject({ awardedPoints: 100, correct: true });
+  });
+
+  it("shows the short-answer grading phase while waiting for AI", async () => {
+    mocks.getAttempt.mockResolvedValue(structuredClone(shortAttempt));
+    vi.stubGlobal("fetch", vi.fn().mockReturnValue(new Promise(() => undefined)));
+    render(<AttemptPlayer attemptId={shortAttempt.id} />);
+
+    fireEvent.change(await screen.findByPlaceholderText("用自己的话说明关键概念、关系或步骤…"), {
+      target: { value: "这是我的简答内容。" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "提交并查看得分" }));
+
+    expect(await screen.findByText("正在评阅简答题…")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("逐项对照评分标准");
   });
 });

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import { AsyncProcessStatus } from "@/components/async-process-status";
 import {
   quizConfigSchema,
   quizSchema,
@@ -71,6 +72,7 @@ export function QuizConfigurator({ sourceId }: { sourceId: string }) {
     outputLanguage: "zh-CN",
   });
   const [generating, setGenerating] = useState(false);
+  const [generationStage, setGenerationStage] = useState(0);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -95,6 +97,23 @@ export function QuizConfigurator({ sourceId }: { sourceId: string }) {
     () => Object.values(config.counts).reduce((sum, count) => sum + count, 0),
     [config.counts],
   );
+  const generationStages = useMemo(
+    () => [
+      ...(Object.keys(config.counts) as Array<keyof QuizConfig["counts"]>)
+        .filter((type) => config.counts[type] > 0)
+        .map((type) => `${typeLabels[type]}题正在生成…`),
+      "正在校验题目与原文…",
+    ],
+    [config.counts],
+  );
+
+  useEffect(() => {
+    if (!generating || generationStages.length < 2) return;
+    const interval = window.setInterval(() => {
+      setGenerationStage((current) => (current + 1) % generationStages.length);
+    }, 1_500);
+    return () => window.clearInterval(interval);
+  }, [generating, generationStages.length]);
   const providerSettings = loadAppSettings().provider;
   const hasProvider = Boolean(providerSettings.baseUrl && providerSettings.model && loadApiKey());
 
@@ -126,6 +145,7 @@ export function QuizConfigurator({ sourceId }: { sourceId: string }) {
     }
 
     setGenerating(true);
+    setGenerationStage(0);
     setError("");
     try {
       const response = await fetch("/api/ai/generate", {
@@ -303,6 +323,15 @@ export function QuizConfigurator({ sourceId }: { sourceId: string }) {
           <span aria-hidden="true">→</span>
         </button>
       </div>
+      {generating ? (
+        <AsyncProcessStatus
+          eyebrow="QUIZ BUILD"
+          title={generationStages[generationStage] ?? "AI 正在编排题目…"}
+          detail="模型会先覆盖知识点，再检查答案、解析和原文章节是否一致。"
+          steps={generationStages.map((stage) => stage.replace("正在", "").replace("…", ""))}
+          activeStep={generationStage}
+        />
+      ) : null}
     </div>
   );
 }
