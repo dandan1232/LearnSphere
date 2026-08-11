@@ -2,6 +2,16 @@
 
 LearnSphere 是一个本地优先的 AI 主动回忆学习工具：粘贴公开技术文档或在线书籍链接，选择章节，生成混合题型测验，并在答题后获得可追溯的评分、原文证据和上下文 AI 讲解。
 
+**在线体验：[learnsphere.nianan.ggff.net](https://learnsphere.nianan.ggff.net)**
+
+## 产品预览
+
+![LearnSphere 学习台](./public/screenshots/learnsphere-home.png)
+
+从公开链接识别书籍目录，选择本次真正要掌握的章节：
+
+![LearnSphere 章节选择](./public/screenshots/learnsphere-source.png)
+
 ## 已实现能力
 
 - 解析 Docsify、VitePress、GitHub Markdown、通用技术文档与文章。
@@ -10,7 +20,9 @@ LearnSphere 是一个本地优先的 AI 主动回忆学习工具：粘贴公开�
 - 题目绑定原文片段；模型输出经过题型、答案、重复项、出处和总分校验。
 - 客观题确定性计分，多选题支持带错选惩罚的部分分；简答题按 rubric 逐项给分并解释原因。
 - 答案、题库、成绩和 AI 对话保存在浏览器 IndexedDB；无需注册账号。
-- 作答中 AI 导师只给提示，不接收正确答案；出分后可直接追问“为什么选 A”。
+- 作答中 AI 导师只给提示，不接收正确答案；出分后可直接追问“为什么选 A”，回复支持 Markdown。
+- 快捷问题点击即发送；对话框支持 Enter 发送、Shift + Enter 换行。
+- 生成题库和评阅答案时展示题型与评分阶段反馈，不使用虚假的完成百分比。
 - 按场次状态、得分情况、题型、章节位置和知识标签筛选复盘记录。
 - 亮色/深色主题、响应式布局、键盘焦点和减少动态效果支持。
 
