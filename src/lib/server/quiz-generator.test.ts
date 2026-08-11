@@ -107,7 +107,12 @@ describe("quiz generation normalization", () => {
     const draft = validDraft();
     draft.questions[0].sectionId = "invented-section";
 
-    expect(() => normalizeGeneratedQuiz(draft, source, config)).toThrowError(AiError);
+    expect(() => normalizeGeneratedQuiz(draft, source, config)).toThrowError(
+      expect.objectContaining({
+        code: "INVALID_RESPONSE",
+        message: "第 1 题使用了不存在的原文章节标识“invented-section”。",
+      }),
+    );
   });
 
   it("rejects duplicate option identifiers and repeated questions", () => {
@@ -159,6 +164,22 @@ describe("quiz generation normalization", () => {
     expect(completion.mock.calls[1][1].messages.at(-1)?.content).toContain("never omit a field");
   });
 
+  it("lists allowed source section ids when repairing an invented section reference", async () => {
+    const inventedReference = validDraft();
+    inventedReference.questions[0].sectionId = "sec-invented";
+    const completion = vi.fn<typeof createChatCompletion>()
+      .mockResolvedValueOnce(JSON.stringify(inventedReference))
+      .mockResolvedValueOnce(JSON.stringify(validDraft()));
+
+    const quiz = await generateQuiz(provider, source, config, completion);
+
+    expect(quiz.questions).toHaveLength(2);
+    const repairPrompt = completion.mock.calls[1][1].messages.at(-1)?.content ?? "";
+    expect(repairPrompt).toContain("第 1 题使用了不存在的原文章节标识“sec-invented”");
+    expect(repairPrompt).toContain("Allowed sectionId values");
+    expect(repairPrompt).toContain("section-observe\nsection-memory");
+  });
+
   it("returns actionable field details when the repair attempt also fails", async () => {
     const incomplete = JSON.stringify({
       title: "字段不完整的题库",
@@ -198,9 +219,11 @@ describe("quiz generation normalization", () => {
       expect(errorLog).toHaveBeenCalledTimes(2);
       const entry = JSON.parse(String(errorLog.mock.calls[0][0])) as {
         event: string;
+        allowedSectionIds: string[];
         response: { raw: string; truncated: boolean };
       };
       expect(entry.event).toBe("quiz_generation_response_rejected");
+      expect(entry.allowedSectionIds).toEqual(["section-observe", "section-memory"]);
       expect(entry.response).toMatchObject({ raw: incomplete, truncated: false });
       expect(String(errorLog.mock.calls[0][0])).not.toContain(provider.apiKey);
     } finally {

@@ -107,6 +107,7 @@ function logRejectedGeneration(
   attempt: number,
   content: string,
   error: AiError,
+  allowedSectionIds: string[],
 ) {
   if (process.env.LOG_REJECTED_AI_RESPONSES !== "1") return;
   const rawResponse = content.slice(0, MAX_LOGGED_AI_RESPONSE_CHARACTERS);
@@ -118,6 +119,7 @@ function logRejectedGeneration(
     maxAttempts: MAX_GENERATION_ATTEMPTS,
     provider: { origin: providerOrigin, model: provider.model },
     validation: { code: error.code, message: error.message },
+    allowedSectionIds,
     response: {
       characters: content.length,
       truncated: content.length > rawResponse.length,
@@ -267,10 +269,15 @@ function normalizeQuestion(
   generated: GeneratedQuestion,
   source: SourceDocument,
   points: number,
+  questionNumber: number,
 ): Question {
   const section = source.sections.find((candidate) => candidate.id === generated.sectionId);
   if (!section) {
-    throw new AiError("INVALID_RESPONSE", "有题目无法关联到原文章节，请重新生成。", 502);
+    throw new AiError(
+      "INVALID_RESPONSE",
+      `第 ${questionNumber} 题使用了不存在的原文章节标识“${generated.sectionId}”。`,
+      502,
+    );
   }
   if (generated.type === "short" && generated.rubric.length === 0) {
     throw new AiError("INVALID_RESPONSE", "模型生成的简答题缺少评分标准，请重新生成。", 502);
@@ -344,10 +351,10 @@ export function normalizeGeneratedQuiz(
   const shortPoints = allocateIntegerPoints(shortCount, shortTotal);
   let objectiveIndex = 0;
   let shortIndex = 0;
-  const questions = selected.map((question) => {
+  const questions = selected.map((question, index) => {
     const points =
       question.type === "short" ? shortPoints[shortIndex++] : objectivePoints[objectiveIndex++];
-    return normalizeQuestion(question, source, points);
+    return normalizeQuestion(question, source, points, index + 1);
   });
 
   const parsedQuiz = quizSchema.safeParse({
@@ -403,12 +410,19 @@ Rules:
 - Avoid duplicate questions and cover distinct source sections where possible.`;
 }
 
-function generationUserPrompt(source: SourceDocument, config: QuizConfig, context: string) {
+function generationUserPrompt(
+  source: SourceDocument,
+  config: QuizConfig,
+  context: string,
+  allowedSectionIds: string[],
+) {
   const counts = config.counts;
   return `Create a quiz in ${config.outputLanguage}.
 Difficulty: ${config.difficulty}.
 Required counts: single=${counts.single}, multiple=${counts.multiple}, boolean=${counts.boolean}, short=${counts.short}.
 Source title: ${source.title}
+Allowed sectionId values (copy exactly; never invent another value):
+${allowedSectionIds.join("\n")}
 
 ${context}`;
 }
@@ -441,8 +455,10 @@ export async function generateQuiz(
     throw new AiError("INVALID_RESPONSE", "原文内容太少，无法生成可靠题目。", 400);
   }
 
+  const allowedSectionIds = [...context.matchAll(/<source_section id="([^"]+)"/g)]
+    .map((match) => match[1]);
   const systemPrompt = generationSystemPrompt();
-  const userPrompt = generationUserPrompt(source, config, context);
+  const userPrompt = generationUserPrompt(source, config, context, allowedSectionIds);
   const maxTokens = Math.min(16_000, 2500 + totalQuestions * 700);
   let validationError: AiError | null = null;
 
@@ -463,7 +479,7 @@ export async function generateQuiz(
       return normalizeGeneratedQuiz(extractJsonObject(content), source, config);
     } catch (error) {
       if (!(error instanceof AiError) || error.code !== "INVALID_RESPONSE") throw error;
-      logRejectedGeneration(provider, attempt + 1, content, error);
+      logRejectedGeneration(provider, attempt + 1, content, error, allowedSectionIds);
       validationError = error;
     }
   }
