@@ -35,13 +35,16 @@ export function HomeDashboard() {
   return (
     <div className="home-layout">
       <section className="launch-panel" aria-labelledby="launch-title">
+        <p className="launch-panel__folio">LEARNING FILE / 001</p>
         <div className="eyebrow">
           <span className="eyebrow__dot" aria-hidden="true" />
-          AI 主动回忆训练
+          主动回忆练习
         </div>
-        <h1 id="launch-title">把昨晚读过的，今天真正答出来。</h1>
+        <h1 id="launch-title">
+          把读过的，<span>真正答出来。</span>
+        </h1>
         <p className="launch-panel__lead">
-          粘贴技术文档或在线书籍。LearnSphere 会识别章节、生成测验，并在你卡住时只给恰到好处的提示。
+          放进一篇技术文档或一章在线书籍。先做题，再沿着答案和原文把没掌握的地方找出来。
         </p>
         <form className="source-form" action="/learn/new" method="get">
           <label htmlFor="source-url">从一个公开链接开始</label>
@@ -56,7 +59,7 @@ export function HomeDashboard() {
               required
             />
             <button className="button button--primary" type="submit">
-              解析并出题
+              开始整理
               <span aria-hidden="true">→</span>
             </button>
           </div>
@@ -71,8 +74,8 @@ export function HomeDashboard() {
 
       <aside className="scoreboard" aria-labelledby="scoreboard-title">
         <div className="scoreboard__topline">
-          <p>今日挑战</p>
-          <span>READY</span>
+          <p>本次练习单</p>
+          <span>OPEN</span>
         </div>
         <h2 id="scoreboard-title">一次十题，测出真正会的部分。</h2>
         <ol className="scoreboard__steps">
@@ -86,7 +89,7 @@ export function HomeDashboard() {
           </li>
           <li>
             <strong>03</strong>
-            <span>追问 AI</span>
+            <span>追问为什么</span>
           </li>
         </ol>
         <div className="scoreboard__streak">

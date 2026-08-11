@@ -27,11 +27,11 @@
   --success: oklch(59% 0.16 145);
   --danger: oklch(58% 0.22 27);
   --shadow-color: oklch(25% 0.05 258 / 14%);
-  --shadow-hard: 0 0.25rem 0 var(--ink-950);
+  --shadow-hard: 0.18rem 0.18rem 0 var(--ink-950);
   --shadow-soft: 0 0.75rem 2rem var(--shadow-color);
-  --radius-sm: 0.55rem;
-  --radius-md: 1rem;
-  --radius-lg: 1.5rem;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.45rem;
+  --radius-lg: 0.7rem;
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -65,7 +65,7 @@
   --lime-500: oklch(79% 0.17 128);
   --coral-500: oklch(72% 0.17 32);
   --shadow-color: oklch(7% 0.02 258 / 38%);
-  --shadow-hard: 0 0.25rem 0 oklch(8% 0.02 258);
+  --shadow-hard: 0.18rem 0.18rem 0 oklch(8% 0.02 258);
 }
 
 * {
@@ -2835,5 +2835,460 @@ textarea:focus-visible {
   .async-process__track span {
     width: 100%;
     transform: none;
+  }
+}
+
+/* Learning Lab: project-owned editorial system. */
+.site-header {
+  min-height: 4.25rem;
+  border-block-end-width: 0.08rem;
+  background: color-mix(in oklch, var(--paper-50) 96%, var(--cobalt-500));
+}
+
+.site-nav {
+  gap: var(--space-4);
+}
+
+.site-nav__link {
+  min-height: 2.25rem;
+  border-radius: 0;
+  padding-inline: var(--space-2);
+}
+
+.site-nav__link[data-active="true"] {
+  background: transparent;
+  color: var(--text-primary);
+  box-shadow: inset 0 -0.18rem 0 var(--lime-500);
+}
+
+.theme-toggle {
+  border-radius: var(--radius-sm);
+  background: transparent;
+}
+
+.site-main {
+  width: min(100%, 86rem);
+}
+
+.launch-panel {
+  position: relative;
+  border-block-start: 0.08rem solid var(--border-strong);
+  padding-block-start: clamp(2.5rem, 6vw, 5.5rem);
+}
+
+.launch-panel__folio {
+  position: absolute;
+  inset-block-start: var(--space-3);
+  inset-inline-end: 0;
+  margin: 0;
+  color: var(--text-secondary);
+  font-family: var(--font-display), var(--font-body), sans-serif;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.eyebrow,
+.section-kicker {
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.launch-panel h1 {
+  max-width: 10ch;
+  font-size: clamp(2.7rem, 6.4vw, 5.2rem);
+  line-height: 0.96;
+  letter-spacing: -0.06em;
+}
+
+.launch-panel h1 span {
+  display: inline;
+  color: var(--cobalt-600);
+}
+
+.launch-panel__lead {
+  max-width: 40rem;
+  margin-block: var(--space-8);
+  font-size: clamp(1rem, 1.6vw, 1.12rem);
+}
+
+.source-form {
+  max-width: 50rem;
+  border-block-start: 0.08rem solid var(--border);
+  padding-block-start: var(--space-4);
+}
+
+.source-form input,
+.inspect-form input {
+  box-shadow: none;
+}
+
+.button {
+  border-width: 0.1rem;
+  letter-spacing: 0.01em;
+}
+
+.scoreboard {
+  border-width: 0.1rem;
+  border-radius: var(--radius-sm);
+  background: var(--cobalt-500);
+  color: oklch(98% 0.01 255);
+  box-shadow: 0.35rem 0.35rem 0 var(--lime-500);
+}
+
+.scoreboard::before {
+  content: "FIELD NOTE";
+  position: absolute;
+  inset-inline-end: 1.5rem;
+  inset-block-start: 8rem;
+  writing-mode: vertical-rl;
+  color: color-mix(in oklch, oklch(98% 0.01 255) 48%, transparent);
+  font-family: var(--font-display), var(--font-body), sans-serif;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+.scoreboard::after {
+  content: "01";
+  inset-inline-end: -0.2rem;
+  inset-block-end: -1.8rem;
+  width: auto;
+  border: 0;
+  border-radius: 0;
+  color: color-mix(in oklch, oklch(98% 0.01 255) 16%, transparent);
+  font-family: var(--font-display), var(--font-body), sans-serif;
+  font-size: 13rem;
+  font-weight: 800;
+  line-height: 0.8;
+  opacity: 1;
+}
+
+.scoreboard__topline span {
+  border: 0.08rem solid currentColor;
+  border-radius: var(--radius-sm);
+  background: var(--lime-500);
+}
+
+.scoreboard h2 {
+  max-width: 11ch;
+  margin-block: clamp(3rem, 8vw, 6rem);
+  font-size: clamp(2.1rem, 4.5vw, 3.6rem);
+}
+
+.scoreboard__steps li {
+  border-block-start-color: color-mix(in oklch, oklch(98% 0.01 255) 45%, transparent);
+}
+
+.scoreboard__steps strong {
+  color: var(--lime-500);
+}
+
+.scoreboard__streak {
+  border-radius: var(--radius-sm);
+  background: var(--paper-50);
+  color: var(--ink-950);
+  rotate: -1.5deg;
+}
+
+.recent-section {
+  padding-block-end: var(--space-8);
+}
+
+.workspace-heading,
+.config-heading {
+  position: relative;
+  border-block-start: 0.08rem solid var(--border-strong);
+  padding-block-start: clamp(2.5rem, 5vw, 4.5rem);
+}
+
+.workspace-heading::after,
+.config-heading::after {
+  content: "LEARNING LAB";
+  position: absolute;
+  inset-block-start: var(--space-3);
+  inset-inline-end: 0;
+  color: var(--text-secondary);
+  font-family: var(--font-display), var(--font-body), sans-serif;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+.workspace-heading h1,
+.config-heading h1 {
+  max-width: 18ch;
+  font-size: clamp(2.2rem, 5vw, 4.3rem);
+  line-height: 1.02;
+}
+
+.inspect-form {
+  border-block-start-width: 0.08rem;
+  border-block-end-width: 0.08rem;
+}
+
+.source-badge {
+  border: 0.08rem solid var(--border-strong);
+  border-radius: var(--radius-sm);
+}
+
+.selection-score {
+  border-block-end: 0.32rem solid var(--lime-500);
+  padding-block-end: var(--space-2);
+}
+
+.chapter-list {
+  max-height: 36rem;
+  border-block-start-color: var(--border-strong);
+}
+
+.chapter-option {
+  grid-template-columns: auto 2.25rem minmax(0, 1fr) auto;
+  gap: var(--space-4);
+  min-height: 4rem;
+  padding-inline-end: var(--space-3);
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.chapter-option__mark {
+  border-radius: 0;
+}
+
+.chapter-option__index {
+  color: var(--text-secondary);
+  font-family: var(--font-display), var(--font-body), sans-serif;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.chapter-option:has(input:checked) {
+  background: color-mix(in oklch, var(--lime-500) 28%, var(--paper-50));
+}
+
+.workspace-actionbar,
+.generate-bar {
+  border-radius: var(--radius-sm);
+  background: var(--paper-100);
+  box-shadow: var(--shadow-hard);
+}
+
+.provider-callout,
+.provider-inline {
+  border-radius: var(--radius-sm);
+  box-shadow: none;
+}
+
+.provider-callout > span {
+  border-radius: var(--radius-sm);
+}
+
+.config-section {
+  grid-template-columns: minmax(10rem, 0.42fr) minmax(0, 1fr);
+  align-items: start;
+  gap: clamp(1.5rem, 5vw, 5rem);
+  padding-block: clamp(2rem, 5vw, 4.5rem);
+}
+
+.config-section__heading {
+  position: sticky;
+  inset-block-start: 6rem;
+}
+
+.preset-grid,
+.count-grid,
+.config-controls {
+  grid-column: 2;
+}
+
+.preset-grid {
+  grid-template-columns: 1fr;
+  gap: 0;
+  border-block-start: 0.1rem solid var(--border-strong);
+}
+
+.preset-option {
+  min-height: 5.25rem;
+  grid-template-columns: 2.25rem minmax(0, 1fr) auto;
+  align-items: center;
+  align-content: center;
+  gap: var(--space-4);
+  border: 0;
+  border-block-end: 0.1rem solid var(--border-strong);
+  border-radius: 0;
+  padding-inline: var(--space-3);
+}
+
+.preset-option__index {
+  color: var(--coral-500);
+  font-family: var(--font-display), var(--font-body), sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+.preset-option > span:last-child {
+  text-align: end;
+}
+
+.preset-option[data-active="true"] {
+  background: var(--cobalt-500);
+  box-shadow: none;
+  translate: 0;
+}
+
+.preset-option[data-active="true"] .preset-option__index {
+  color: var(--lime-500);
+}
+
+.count-grid,
+.config-controls {
+  border: 0.1rem solid var(--border-strong);
+  border-radius: var(--radius-sm);
+}
+
+.generate-bar {
+  position: sticky;
+  inset-block-end: var(--space-3);
+  z-index: 90;
+}
+
+.question-stage {
+  min-height: auto;
+  scroll-margin-block-start: 6.5rem;
+  padding-block-end: var(--space-8);
+}
+
+.question-stage__meta span {
+  border-radius: var(--radius-sm);
+}
+
+.answer-option {
+  border-radius: var(--radius-sm);
+  box-shadow: none;
+}
+
+.answer-option[data-selected="true"] {
+  box-shadow: inset 0.35rem 0 0 var(--lime-500);
+  translate: 0;
+}
+
+.attempt-actions {
+  position: fixed;
+  inset-inline: max(clamp(1rem, 4vw, 4rem), calc((100vw - 68rem) / 2));
+  inset-block-end: max(var(--space-3), env(safe-area-inset-bottom));
+  z-index: 120;
+  grid-template-columns: minmax(0, auto) minmax(5.5rem, 1fr) minmax(0, auto);
+  margin-block-start: var(--space-4);
+  border: 0.1rem solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--paper-50);
+  padding: var(--space-3);
+  box-shadow: var(--shadow-hard);
+}
+
+.attempt-actions .button {
+  width: fit-content;
+  min-width: 7.5rem;
+}
+
+@media (max-width: 41.99rem) {
+  .site-main {
+    padding-inline: var(--space-4);
+  }
+
+  .launch-panel__folio,
+  .workspace-heading::after,
+  .config-heading::after {
+    inset-inline-end: var(--space-1);
+  }
+
+  .scoreboard {
+    box-shadow: 0.25rem 0.25rem 0 var(--lime-500);
+  }
+
+  .chapter-option {
+    grid-template-columns: auto 1.75rem minmax(0, 1fr);
+    gap: var(--space-3);
+  }
+
+  .chapter-option__state {
+    display: none;
+  }
+
+  .config-section {
+    grid-template-columns: 1fr;
+    gap: var(--space-6);
+  }
+
+  .config-section__heading {
+    position: static;
+  }
+
+  .preset-grid,
+  .count-grid,
+  .config-controls {
+    grid-column: 1;
+  }
+
+  .preset-option {
+    grid-template-columns: 2rem minmax(0, 1fr);
+  }
+
+  .preset-option > span:last-child {
+    grid-column: 2;
+    text-align: start;
+  }
+
+  .attempt-player {
+    padding-block-end: 7rem;
+  }
+
+  .attempt-actions {
+    gap: var(--space-2);
+    padding: var(--space-2);
+  }
+
+  .attempt-actions > span {
+    font-size: 0.68rem;
+  }
+
+  .attempt-actions .button {
+    min-width: 0;
+    padding-inline: var(--space-3);
+  }
+}
+
+@media (min-width: 64rem) {
+  .home-layout {
+    grid-template-columns: minmax(0, 1.12fr) minmax(22rem, 0.88fr);
+  }
+
+  .scoreboard {
+    min-height: 35rem;
+  }
+
+  .preset-grid,
+  .count-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .site-nav__link:hover:not([data-active="true"]) {
+    background: transparent;
+    box-shadow: inset 0 -0.12rem 0 var(--border);
+  }
+
+  .chapter-option:hover:not(:has(input:checked)) {
+    background: var(--paper-100);
+  }
+
+  .preset-option:hover:not([data-active="true"]),
+  .answer-option:hover:not([data-selected="true"]) {
+    translate: 0;
+    box-shadow: inset 0.25rem 0 0 var(--coral-500);
   }
 }

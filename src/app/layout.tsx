@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Fredoka, Noto_Sans_SC } from "next/font/google";
+import { Bricolage_Grotesque, Noto_Sans_SC } from "next/font/google";
 import type { ReactNode } from "react";
 
 import { AppShell } from "@/components/app-shell";
@@ -13,7 +13,7 @@ const bodyFont = Noto_Sans_SC({
   preload: false,
 });
 
-const displayFont = Fredoka({
+const displayFont = Bricolage_Grotesque({
   variable: "--font-display",
   subsets: ["latin"],
   display: "swap",

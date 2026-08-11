@@ -92,6 +92,26 @@ const shortAttempt: Attempt = {
   },
 };
 
+const multiQuestionAttempt: Attempt = {
+  ...structuredClone(attempt),
+  id: "attempt-multi",
+  quizSnapshot: {
+    ...structuredClone(attempt.quizSnapshot),
+    config: {
+      ...attempt.quizSnapshot.config,
+      counts: { single: 2, multiple: 0, boolean: 0, short: 0 },
+    },
+    questions: [
+      structuredClone(attempt.quizSnapshot.questions[0]),
+      {
+        ...structuredClone(attempt.quizSnapshot.questions[0]),
+        id: "question-2",
+        prompt: "第二题应该稳定出现在页头下方吗？",
+      },
+    ],
+  },
+};
+
 describe("AttemptPlayer", () => {
   beforeEach(() => {
     mocks.push.mockReset();
@@ -125,5 +145,24 @@ describe("AttemptPlayer", () => {
 
     expect(await screen.findByText("正在评阅简答题…")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("逐项对照评分标准");
+  });
+
+  it("aligns the next question instead of scrolling the whole page to the top", async () => {
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoView,
+    });
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      callback(0);
+      return 1;
+    });
+    mocks.getAttempt.mockResolvedValue(structuredClone(multiQuestionAttempt));
+
+    render(<AttemptPlayer attemptId={multiQuestionAttempt.id} />);
+    fireEvent.click(await screen.findByRole("button", { name: "下一题 →" }));
+
+    expect(await screen.findByRole("heading", { name: "第二题应该稳定出现在页头下方吗？" })).toBeInTheDocument();
+    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
   });
 });

@@ -218,7 +218,7 @@ export function SourceImporter({ initialUrl }: SourceImporterProps) {
 
           <fieldset className="chapter-list">
             <legend className="visually-hidden">选择用于生成测验的章节</legend>
-            {filteredChapters.map((chapter) => (
+            {filteredChapters.map((chapter, index) => (
               <label
                 key={chapter.id}
                 className="chapter-option"
@@ -230,6 +230,9 @@ export function SourceImporter({ initialUrl }: SourceImporterProps) {
                   onChange={() => toggleChapter(chapter.id)}
                 />
                 <span className="chapter-option__mark" aria-hidden="true" />
+                <span className="chapter-option__index" aria-hidden="true">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
                 <span className="chapter-option__title">{chapter.title}</span>
                 <span className="chapter-option__state">
                   {selectedChapterIds.has(chapter.id) ? "已加入" : "选择"}

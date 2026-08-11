@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AsyncProcessStatus } from "@/components/async-process-status";
 import { TutorPanel } from "@/components/tutor-panel";
@@ -37,6 +37,8 @@ export function AttemptPlayer({ attemptId }: { attemptId: string }) {
   const [gradingPhase, setGradingPhase] = useState<GradingPhase>("objective");
   const [error, setError] = useState("");
   const [tutorOpen, setTutorOpen] = useState(false);
+  const questionStageRef = useRef<HTMLElement>(null);
+  const shouldAlignQuestion = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -69,6 +71,15 @@ export function AttemptPlayer({ attemptId }: { attemptId: string }) {
       return item.type === "short" ? Boolean(itemAnswer?.text.trim()) : Boolean(itemAnswer?.selectedOptionIds.length);
     }).length;
   }, [attempt]);
+
+  useEffect(() => {
+    if (!shouldAlignQuestion.current) return;
+    shouldAlignQuestion.current = false;
+    const frame = window.requestAnimationFrame(() => {
+      questionStageRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [currentIndex]);
 
   function updateAnswer(nextAnswer: LearnerAnswer) {
     if (!attempt || !question) return;
@@ -111,8 +122,8 @@ export function AttemptPlayer({ attemptId }: { attemptId: string }) {
   async function moveTo(index: number) {
     if (!attempt) return;
     await putAttempt(attempt);
+    shouldAlignQuestion.current = true;
     setCurrentIndex(Math.max(0, Math.min(attempt.quizSnapshot.questions.length - 1, index)));
-    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   async function submitAttempt() {
@@ -242,7 +253,7 @@ export function AttemptPlayer({ attemptId }: { attemptId: string }) {
         <span style={{ width: `${progress}%` }} />
       </div>
 
-      <article className="question-stage">
+      <article ref={questionStageRef} className="question-stage">
         <div className="question-stage__meta">
           <span>{typeLabel[question.type]}</span>
           <span>{question.points} 分</span>

@@ -233,7 +233,7 @@ export function QuizConfigurator({ sourceId }: { sourceId: string }) {
           </div>
         </div>
         <div className="preset-grid">
-          {presets.map((preset) => (
+          {presets.map((preset, index) => (
             <button
               key={preset.id}
               className="preset-option"
@@ -241,6 +241,9 @@ export function QuizConfigurator({ sourceId }: { sourceId: string }) {
               type="button"
               onClick={() => choosePreset(preset)}
             >
+              <span className="preset-option__index" aria-hidden="true">
+                {String(index + 1).padStart(2, "0")}
+              </span>
               <strong>{preset.name}</strong>
               <span>{preset.description}</span>
             </button>
