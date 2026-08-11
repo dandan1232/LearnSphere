@@ -110,6 +110,33 @@ describe("quiz generation normalization", () => {
     expect(quiz.questions[1].rubric.reduce((sum, criterion) => sum + criterion.points, 0)).toBe(30);
   });
 
+  it("normalizes type-specific fields from otherwise usable model output", () => {
+    const draft = validDraft();
+    const raw = {
+      ...draft,
+      questions: [
+        {
+          ...draft.questions[0],
+          rubric: [{ description: "客观题不应保留的评分标准", weight: 1 }],
+        },
+        {
+          ...draft.questions[1],
+          referenceAnswer: undefined,
+          correctOptionIds: "短期记忆保存当前上下文，长期记忆支持跨任务知识检索。",
+        },
+      ],
+    };
+
+    const quiz = normalizeGeneratedQuiz(raw, source, config);
+
+    expect(quiz.questions[0].rubric).toEqual([]);
+    expect(quiz.questions[1].correctOptionIds).toEqual([]);
+    expect(quiz.questions[1].referenceAnswer).toBe(
+      "短期记忆保存当前上下文，长期记忆支持跨任务知识检索。",
+    );
+    expect(quiz.questions[1].rubric.reduce((sum, criterion) => sum + criterion.points, 0)).toBe(30);
+  });
+
   it("rejects model-provided section identifiers that do not exist", () => {
     const draft = validDraft();
     draft.questions[0].sectionId = "invented-section";

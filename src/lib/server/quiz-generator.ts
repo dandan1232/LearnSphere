@@ -25,7 +25,7 @@ const MAX_LOGGED_AI_RESPONSE_CHARACTERS = 200_000;
 const SCORE_PRECISION = 100;
 const MIN_RUBRIC_POINTS = 0.25;
 
-const generatedQuestionSchema = z.object({
+const generatedQuestionObjectSchema = z.object({
   type: questionTypeSchema,
   prompt: z.string().trim().min(4).max(1200),
   options: z
@@ -48,7 +48,40 @@ const generatedQuestionSchema = z.object({
   difficulty: difficultySchema,
   knowledgeTags: z.array(z.string().trim().min(1).max(80)).min(1).max(6),
   sectionId: z.string().trim().min(1),
+}).superRefine((question, context) => {
+  if (question.type === "short" && question.referenceAnswer.length === 0) {
+    context.addIssue({
+      code: "custom",
+      message: "Short questions require a reference answer",
+      path: ["referenceAnswer"],
+    });
+  }
 });
+
+const generatedQuestionSchema = z.preprocess((value) => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+
+  const question = { ...(value as Record<string, unknown>) };
+  if (question.type === "short") {
+    if (
+      typeof question.correctOptionIds === "string" &&
+      (typeof question.referenceAnswer !== "string" || question.referenceAnswer.trim().length === 0)
+    ) {
+      question.referenceAnswer = question.correctOptionIds;
+    }
+    question.options = [];
+    question.correctOptionIds = [];
+  } else if (
+    question.type === "single" ||
+    question.type === "multiple" ||
+    question.type === "boolean"
+  ) {
+    question.referenceAnswer = "";
+    question.rubric = [];
+  }
+
+  return question;
+}, generatedQuestionObjectSchema);
 
 const generatedQuizSchema = z.object({
   title: z.string().trim().min(2).max(200),
@@ -325,11 +358,13 @@ function normalizeQuestion(
     options: generated.type === "short" ? [] : generated.options,
     correctOptionIds: generated.type === "short" ? [] : generated.correctOptionIds,
     referenceAnswer: generated.type === "short" ? generated.referenceAnswer.trim() : "",
-    rubric: generated.rubric.map((criterion, index) => ({
-      id: `criterion-${randomUUID()}`,
-      description: criterion.description.trim(),
-      points: rubricPoints[index],
-    })),
+    rubric: generated.type === "short"
+      ? generated.rubric.map((criterion, index) => ({
+          id: `criterion-${randomUUID()}`,
+          description: criterion.description.trim(),
+          points: rubricPoints[index],
+        }))
+      : [],
     explanation: generated.explanation.trim(),
     points,
     difficulty: generated.difficulty,
@@ -430,7 +465,9 @@ Rules:
 - Single and boolean questions have exactly one correct option.
 - Multiple-choice questions have at least two correct options and at least one incorrect option.
 - Objective questions need plausible, unambiguous options; do not use “all of the above”.
-- Short answers need 2–5 independent rubric criteria and a concise reference answer.
+- For single, multiple, and boolean questions, always use rubric: [] and referenceAnswer: "".
+- For short questions, always use options: [] and correctOptionIds: [].
+- Short answers need 2–5 independent rubric criteria and a concise non-empty referenceAnswer.
 - Explanations must teach the concept, not merely repeat the correct option.
 - Avoid duplicate questions and cover distinct source sections where possible.`;
 }
