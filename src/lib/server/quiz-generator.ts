@@ -19,6 +19,7 @@ import {
 import { AiError, createChatCompletion } from "@/lib/server/ai-client";
 
 const MAX_CONTEXT_CHARACTERS = 72_000;
+const MIN_SOURCE_CONTENT_CHARACTERS = 200;
 const MAX_GENERATION_ATTEMPTS = 2;
 const MAX_LOGGED_AI_RESPONSE_CHARACTERS = 200_000;
 const SCORE_PRECISION = 100;
@@ -56,6 +57,13 @@ const generatedQuizSchema = z.object({
 
 type GeneratedQuestion = z.infer<typeof generatedQuestionSchema>;
 type ChatCompletion = typeof createChatCompletion;
+type SectionAliasMap = ReadonlyMap<string, string>;
+
+interface SourceContextPlan {
+  text: string;
+  sectionAliases: Map<string, string>;
+  contentCharacters: number;
+}
 
 const generatedFieldLabels: Record<string, string> = {
   title: "题库标题",
@@ -198,7 +206,7 @@ function extractJsonObject(content: string) {
   }
 }
 
-export function buildSourceContext(source: SourceDocument) {
+function buildSourceContextPlan(source: SourceDocument): SourceContextPlan {
   const groups = new Map<string, typeof source.sections>();
   for (const chapter of source.chapters) groups.set(chapter.id, []);
   for (const section of source.sections) {
@@ -208,25 +216,34 @@ export function buildSourceContext(source: SourceDocument) {
   }
 
   const selected: string[] = [];
+  const sectionAliases = new Map<string, string>();
   let usedCharacters = 0;
+  let contentCharacters = 0;
   let cursor = 0;
   const groupValues = [...groups.values()].filter((group) => group.length > 0);
   while (usedCharacters < MAX_CONTEXT_CHARACTERS && groupValues.some((group) => cursor < group.length)) {
     for (const group of groupValues) {
       const section = group[cursor];
       if (!section) continue;
+      const alias = `S${String(sectionAliases.size + 1).padStart(3, "0")}`;
       const block = [
-        `<source_section id="${section.id}" locator="${section.locator}">`,
+        `<source_section id="${alias}" locator="${section.locator}">`,
         section.text.slice(0, 5000),
         "</source_section>",
       ].join("\n");
       if (usedCharacters + block.length > MAX_CONTEXT_CHARACTERS && selected.length > 0) continue;
       selected.push(block);
+      sectionAliases.set(alias, section.id);
       usedCharacters += block.length;
+      contentCharacters += Math.min(section.text.length, 5000);
     }
     cursor += 1;
   }
-  return selected.join("\n\n");
+  return { text: selected.join("\n\n"), sectionAliases, contentCharacters };
+}
+
+export function buildSourceContext(source: SourceDocument) {
+  return buildSourceContextPlan(source).text;
 }
 
 function validateObjectiveQuestion(question: GeneratedQuestion) {
@@ -270,12 +287,19 @@ function normalizeQuestion(
   source: SourceDocument,
   points: number,
   questionNumber: number,
+  sectionAliases?: SectionAliasMap,
 ): Question {
-  const section = source.sections.find((candidate) => candidate.id === generated.sectionId);
+  const resolvedSectionId = sectionAliases
+    ? sectionAliases.get(generated.sectionId)
+    : generated.sectionId;
+  const section = resolvedSectionId
+    ? source.sections.find((candidate) => candidate.id === resolvedSectionId)
+    : undefined;
   if (!section) {
+    const identifierLabel = sectionAliases ? "原文章节别名" : "原文章节标识";
     throw new AiError(
       "INVALID_RESPONSE",
-      `第 ${questionNumber} 题使用了不存在的原文章节标识“${generated.sectionId}”。`,
+      `第 ${questionNumber} 题使用了不存在的${identifierLabel}“${generated.sectionId}”。`,
       502,
     );
   }
@@ -322,6 +346,7 @@ export function normalizeGeneratedQuiz(
   raw: unknown,
   source: SourceDocument,
   config: QuizConfig,
+  sectionAliases?: SectionAliasMap,
 ): Quiz {
   const parsedDraft = generatedQuizSchema.safeParse(raw);
   if (!parsedDraft.success) {
@@ -354,7 +379,7 @@ export function normalizeGeneratedQuiz(
   const questions = selected.map((question, index) => {
     const points =
       question.type === "short" ? shortPoints[shortIndex++] : objectivePoints[objectiveIndex++];
-    return normalizeQuestion(question, source, points, index + 1);
+    return normalizeQuestion(question, source, points, index + 1, sectionAliases);
   });
 
   const parsedQuiz = quizSchema.safeParse({
@@ -395,13 +420,13 @@ Return one JSON object only, without Markdown fences. Shape:
     "explanation": "why the answer is correct and alternatives are wrong",
     "difficulty": "easy|medium|hard",
     "knowledgeTags": ["specific concept"],
-    "sectionId": "exact id copied from a source_section"
+    "sectionId": "exact short alias copied from a source_section, for example S001"
   }]
 }
 
 Rules:
 - Use only facts supported by the supplied source sections.
-- Every question must use an exact source section id.
+- Every question must use an exact short source section alias such as S001.
 - Single and boolean questions have exactly one correct option.
 - Multiple-choice questions have at least two correct options and at least one incorrect option.
 - Objective questions need plausible, unambiguous options; do not use “all of the above”.
@@ -433,7 +458,7 @@ Generate a complete replacement JSON object from scratch.
 - Include every field shown in the required shape for every question.
 - Use [] for non-applicable arrays and "" for non-applicable strings; never omit a field.
 - Match every requested question count exactly.
-- Copy sectionId exactly from a supplied source_section.
+- Copy the short sectionId alias exactly from a supplied source_section.
 - Return JSON only, with no Markdown or commentary.`;
 }
 
@@ -450,13 +475,13 @@ export async function generateQuiz(
     throw new AiError("INVALID_RESPONSE", "一次测验需要 1 到 30 道题。", 400);
   }
 
-  const context = buildSourceContext(source);
-  if (context.length < 200) {
+  const contextPlan = buildSourceContextPlan(source);
+  const context = contextPlan.text;
+  if (contextPlan.contentCharacters < MIN_SOURCE_CONTENT_CHARACTERS) {
     throw new AiError("INVALID_RESPONSE", "原文内容太少，无法生成可靠题目。", 400);
   }
 
-  const allowedSectionIds = [...context.matchAll(/<source_section id="([^"]+)"/g)]
-    .map((match) => match[1]);
+  const allowedSectionIds = [...contextPlan.sectionAliases.keys()];
   const systemPrompt = generationSystemPrompt();
   const userPrompt = generationUserPrompt(source, config, context, allowedSectionIds);
   const maxTokens = Math.min(16_000, 2500 + totalQuestions * 700);
@@ -476,7 +501,12 @@ export async function generateQuiz(
     });
 
     try {
-      return normalizeGeneratedQuiz(extractJsonObject(content), source, config);
+      return normalizeGeneratedQuiz(
+        extractJsonObject(content),
+        source,
+        config,
+        contextPlan.sectionAliases,
+      );
     } catch (error) {
       if (!(error instanceof AiError) || error.code !== "INVALID_RESPONSE") throw error;
       logRejectedGeneration(provider, attempt + 1, content, error, allowedSectionIds);

@@ -27,14 +27,14 @@ const source: SourceDocument = {
       chapterId: "chapter-1",
       title: "观察与行动",
       locator: "第一章 / 观察与行动",
-      text: "智能体会先观察环境，再根据目标选择行动，并根据环境反馈继续调整后续行动。",
+      text: "智能体会先观察环境，再根据目标选择行动，并根据环境反馈继续调整后续行动。".repeat(4),
     },
     {
       id: "section-memory",
       chapterId: "chapter-1",
       title: "记忆",
       locator: "第一章 / 记忆",
-      text: "短期记忆保存当前任务上下文，长期记忆用于跨任务检索稳定知识。",
+      text: "短期记忆保存当前任务上下文，长期记忆用于跨任务检索稳定知识。".repeat(4),
     },
   ],
   contentHash: "hash",
@@ -91,6 +91,13 @@ function validDraft() {
       },
     ],
   };
+}
+
+function aliasedDraft() {
+  const draft = validDraft();
+  draft.questions[0].sectionId = "S001";
+  draft.questions[1].sectionId = "S002";
+  return draft;
 }
 
 describe("quiz generation normalization", () => {
@@ -153,7 +160,7 @@ describe("quiz generation normalization", () => {
         title: "字段不完整的题库",
         questions: [{ type: "single", prompt: "智能体先做什么？" }],
       }))
-      .mockResolvedValueOnce(JSON.stringify(validDraft()));
+      .mockResolvedValueOnce(JSON.stringify(aliasedDraft()));
 
     const quiz = await generateQuiz(provider, source, config, completion);
 
@@ -165,19 +172,23 @@ describe("quiz generation normalization", () => {
   });
 
   it("lists allowed source section ids when repairing an invented section reference", async () => {
-    const inventedReference = validDraft();
-    inventedReference.questions[0].sectionId = "sec-invented";
+    const inventedReference = aliasedDraft();
+    inventedReference.questions[0].sectionId = "S999";
     const completion = vi.fn<typeof createChatCompletion>()
       .mockResolvedValueOnce(JSON.stringify(inventedReference))
-      .mockResolvedValueOnce(JSON.stringify(validDraft()));
+      .mockResolvedValueOnce(JSON.stringify(aliasedDraft()));
 
     const quiz = await generateQuiz(provider, source, config, completion);
 
     expect(quiz.questions).toHaveLength(2);
+    expect(quiz.questions.map((question) => question.source.sectionId)).toEqual([
+      "section-observe",
+      "section-memory",
+    ]);
     const repairPrompt = completion.mock.calls[1][1].messages.at(-1)?.content ?? "";
-    expect(repairPrompt).toContain("第 1 题使用了不存在的原文章节标识“sec-invented”");
+    expect(repairPrompt).toContain("第 1 题使用了不存在的原文章节别名“S999”");
     expect(repairPrompt).toContain("Allowed sectionId values");
-    expect(repairPrompt).toContain("section-observe\nsection-memory");
+    expect(repairPrompt).toContain("S001\nS002");
   });
 
   it("returns actionable field details when the repair attempt also fails", async () => {
@@ -223,7 +234,7 @@ describe("quiz generation normalization", () => {
         response: { raw: string; truncated: boolean };
       };
       expect(entry.event).toBe("quiz_generation_response_rejected");
-      expect(entry.allowedSectionIds).toEqual(["section-observe", "section-memory"]);
+      expect(entry.allowedSectionIds).toEqual(["S001", "S002"]);
       expect(entry.response).toMatchObject({ raw: incomplete, truncated: false });
       expect(String(errorLog.mock.calls[0][0])).not.toContain(provider.apiKey);
     } finally {
@@ -274,11 +285,13 @@ describe("quiz generation normalization", () => {
 });
 
 describe("source context construction", () => {
-  it("marks every source block as untrusted content with an exact section id", () => {
+  it("marks every source block as untrusted content with a short section alias", () => {
     const context = buildSourceContext(source);
 
-    expect(context).toContain('<source_section id="section-observe"');
-    expect(context).toContain('<source_section id="section-memory"');
+    expect(context).toContain('<source_section id="S001"');
+    expect(context).toContain('<source_section id="S002"');
+    expect(context).not.toContain("section-observe");
+    expect(context).not.toContain("section-memory");
     expect(context).toContain("</source_section>");
   });
 });
