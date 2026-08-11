@@ -20,6 +20,7 @@ import { AiError, createChatCompletion } from "@/lib/server/ai-client";
 
 const MAX_CONTEXT_CHARACTERS = 72_000;
 const MAX_GENERATION_ATTEMPTS = 2;
+const MAX_LOGGED_AI_RESPONSE_CHARACTERS = 200_000;
 const SCORE_PRECISION = 100;
 const MIN_RUBRIC_POINTS = 0.25;
 
@@ -70,6 +71,9 @@ const generatedFieldLabels: Record<string, string> = {
   knowledgeTags: "知识点标签",
   sectionId: "原文章节标识",
   points: "分值",
+  id: "标识",
+  text: "内容",
+  description: "描述",
 };
 
 function describeGeneratedQuizIssues(error: z.ZodError) {
@@ -77,14 +81,49 @@ function describeGeneratedQuizIssues(error: z.ZodError) {
     const questionIndex = issue.path[0] === "questions" && typeof issue.path[1] === "number"
       ? issue.path[1]
       : null;
-    const rawField = String(issue.path.at(-1) ?? "questions");
+    if (questionIndex === null) {
+      const rawField = String(issue.path.at(-1) ?? "questions");
+      return generatedFieldLabels[rawField] ?? rawField;
+    }
+
+    const rawField = String(issue.path[2] ?? issue.path.at(-1) ?? "questions");
     const field = generatedFieldLabels[rawField] ?? rawField;
-    return questionIndex === null ? field : `第 ${questionIndex + 1} 题的${field}`;
+    const itemIndex = issue.path[3];
+    const nestedField = issue.path[4];
+    const item = typeof itemIndex === "number" ? `第 ${itemIndex + 1} 项` : "";
+    const nested = nestedField === undefined
+      ? ""
+      : `的${generatedFieldLabels[String(nestedField)] ?? String(nestedField)}`;
+    return `第 ${questionIndex + 1} 题的${field}${item}${nested}`;
   });
   const uniqueFields = [...new Set(fields)];
   const visibleFields = uniqueFields.slice(0, 6).join("、");
   const remainder = uniqueFields.length > 6 ? `等 ${uniqueFields.length} 处` : "";
   return `${visibleFields}${remainder}`;
+}
+
+function logRejectedGeneration(
+  provider: AiProviderCredentials,
+  attempt: number,
+  content: string,
+  error: AiError,
+) {
+  if (process.env.LOG_REJECTED_AI_RESPONSES !== "1") return;
+  const rawResponse = content.slice(0, MAX_LOGGED_AI_RESPONSE_CHARACTERS);
+  const providerOrigin = new URL(provider.baseUrl).origin;
+  console.error(JSON.stringify({
+    level: "error",
+    event: "quiz_generation_response_rejected",
+    attempt,
+    maxAttempts: MAX_GENERATION_ATTEMPTS,
+    provider: { origin: providerOrigin, model: provider.model },
+    validation: { code: error.code, message: error.message },
+    response: {
+      characters: content.length,
+      truncated: content.length > rawResponse.length,
+      raw: rawResponse,
+    },
+  }));
 }
 
 function describeFinalQuizIssues(error: z.ZodError) {
@@ -424,6 +463,7 @@ export async function generateQuiz(
       return normalizeGeneratedQuiz(extractJsonObject(content), source, config);
     } catch (error) {
       if (!(error instanceof AiError) || error.code !== "INVALID_RESPONSE") throw error;
+      logRejectedGeneration(provider, attempt + 1, content, error);
       validationError = error;
     }
   }

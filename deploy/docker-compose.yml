@@ -9,6 +9,7 @@ services:
     environment:
       NODE_ENV: production
       NEXT_TELEMETRY_DISABLED: "1"
+      LOG_REJECTED_AI_RESPONSES: "1"
     ports:
       - "127.0.0.1:3100:3000"
     healthcheck:

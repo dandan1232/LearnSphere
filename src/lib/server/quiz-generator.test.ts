@@ -174,6 +174,42 @@ describe("quiz generation normalization", () => {
     expect(completion).toHaveBeenCalledTimes(2);
   });
 
+  it("logs rejected raw responses without logging the API key when diagnostics are enabled", async () => {
+    const originalSetting = process.env.LOG_REJECTED_AI_RESPONSES;
+    process.env.LOG_REJECTED_AI_RESPONSES = "1";
+    const incomplete = JSON.stringify({
+      title: "标签格式错误",
+      questions: [{
+        type: "single",
+        prompt: "智能体先做什么？",
+        explanation: "根据原文解释。",
+        difficulty: "easy",
+        knowledgeTags: [0, 1],
+        sectionId: "section-observe",
+      }],
+    });
+    const completion = vi.fn<typeof createChatCompletion>().mockResolvedValue(incomplete);
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    try {
+      await expect(generateQuiz(provider, source, config, completion)).rejects.toThrow(
+        "第 1 题的知识点标签第 1 项",
+      );
+      expect(errorLog).toHaveBeenCalledTimes(2);
+      const entry = JSON.parse(String(errorLog.mock.calls[0][0])) as {
+        event: string;
+        response: { raw: string; truncated: boolean };
+      };
+      expect(entry.event).toBe("quiz_generation_response_rejected");
+      expect(entry.response).toMatchObject({ raw: incomplete, truncated: false });
+      expect(String(errorLog.mock.calls[0][0])).not.toContain(provider.apiKey);
+    } finally {
+      errorLog.mockRestore();
+      if (originalSetting === undefined) delete process.env.LOG_REJECTED_AI_RESPONSES;
+      else process.env.LOG_REJECTED_AI_RESPONSES = originalSetting;
+    }
+  });
+
   it("keeps every rubric criterion valid when many short answers split a small score", () => {
     const shortHeavyConfig: QuizConfig = {
       preset: "custom",
